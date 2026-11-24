@@ -1,0 +1,49 @@
+import { useCallback, useEffect, useState } from 'react'
+
+export type ThemeMode = 'light' | 'dark'
+
+const THEME_STORAGE_KEY = 'acp-control-theme'
+
+export function getInitialTheme(): ThemeMode {
+  if (typeof window === 'undefined') return 'light'
+  try {
+    const stored = window.localStorage.getItem(THEME_STORAGE_KEY)
+    if (stored === 'light' || stored === 'dark') return stored
+  } catch {
+    // noop
+  }
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+}
+
+export function applyTheme(theme: ThemeMode): void {
+  if (typeof document === 'undefined') return
+  const root = document.documentElement
+  if (theme === 'dark') {
+    root.classList.add('dark')
+  } else {
+    root.classList.remove('dark')
+  }
+  try {
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme)
+  } catch {
+    // noop
+  }
+}
+
+export function useTheme() {
+  const [theme, setThemeState] = useState<ThemeMode>(getInitialTheme)
+
+  useEffect(() => {
+    applyTheme(theme)
+  }, [theme])
+
+  const setTheme = useCallback((next: ThemeMode) => {
+    setThemeState(next)
+  }, [])
+
+  const toggleTheme = useCallback(() => {
+    setThemeState((prev) => (prev === 'dark' ? 'light' : 'dark'))
+  }, [])
+
+  return { theme, setTheme, toggleTheme }
+}
