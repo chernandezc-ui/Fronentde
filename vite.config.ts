@@ -32,7 +32,7 @@ export default defineConfig({
             },
             {
               name: 'vendor-ui',
-              test: /node_modules[\\/](@base-ui|cmdk|sonner|lucide-react|class-variance-authority|clsx|tailwind-merge|cn)/,
+              test: /node_modules[\\/](@base-ui|cmdk|sonner|lucide-react|class-variance-authority|cn)/,
               priority: 20,
             },
             {
@@ -44,11 +44,6 @@ export default defineConfig({
               name: 'vendor-forms',
               test: /node_modules[\\/](react-hook-form|@hookform|zod)/,
               priority: 20,
-            },
-            {
-              name: 'vendor-echarts',
-              test: /node_modules[\\/]echarts/,
-              priority: 25,
             },
           ],
         },

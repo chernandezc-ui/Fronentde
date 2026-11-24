@@ -1,29 +1,31 @@
 import { apiRequest } from '@/shared/api/client'
+import { normalizePaginated } from '@/shared/api/normalize'
 import type {
+  CuarentenaIncidencia,
+  OperarioPersonal,
   PaginatedCuarentenaResponse,
   PaginatedPersonalResponse,
 } from './types'
 
-export function fetchPersonal(
+export async function fetchPersonal(
   pagina = 1,
   tamano = 50,
 ): Promise<PaginatedPersonalResponse> {
-  return apiRequest<PaginatedPersonalResponse>(
-    '/api/v1/catalogos/personal',
-    {
-      query: { pagina, tamano },
-    },
-  )
+  const raw = await apiRequest<unknown>('/api/v1/catalogos/personal', {
+    query: { pagina, tamano },
+  })
+  return normalizePaginated<OperarioPersonal>(raw, pagina, tamano)
 }
 
-export function fetchCuarentenaSnapshot(
+export async function fetchCuarentenaSnapshot(
   tamano = 200,
 ): Promise<PaginatedCuarentenaResponse> {
-  return apiRequest<PaginatedCuarentenaResponse>('/api/v1/cuarentena', {
+  const raw = await apiRequest<unknown>('/api/v1/cuarentena', {
     query: {
       pagina: 1,
       tamano,
       estado_filtro: 'all',
     },
   })
+  return normalizePaginated<CuarentenaIncidencia>(raw, 1, tamano)
 }

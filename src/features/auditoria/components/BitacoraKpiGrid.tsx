@@ -172,7 +172,7 @@ export function BitacoraKpiGrid({
                     tasaToneClass,
                   )}
                 >
-                  {resumen.tasa_exito_pct.toFixed(1)}%
+                  {(Number.isFinite(resumen.tasa_exito_pct) ? resumen.tasa_exito_pct : 0).toFixed(1)}%
                 </p>
               )}
               <p className="truncate font-mono text-[11px] text-muted-foreground tabular-nums">

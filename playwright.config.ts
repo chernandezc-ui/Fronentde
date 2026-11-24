@@ -1,4 +1,17 @@
+import fs from 'node:fs'
 import { defineConfig } from '@playwright/test'
+
+function resolveChromiumExecutable(): string | undefined {
+  const candidates = [
+    'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+    'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+    'C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe',
+  ]
+  return candidates.find((p) => fs.existsSync(p))
+}
+
+const detectedBrowserPath = resolveChromiumExecutable()
 
 export default defineConfig({
   testDir: './e2e',
@@ -8,7 +21,9 @@ export default defineConfig({
   reporter: [['list']],
   use: {
     baseURL: 'http://localhost:4173',
-    channel: 'msedge',
+    ...(detectedBrowserPath
+      ? { launchOptions: { executablePath: detectedBrowserPath } }
+      : { channel: 'msedge' }),
     trace: 'off',
     reducedMotion: 'reduce',
   },
@@ -19,10 +34,12 @@ export default defineConfig({
     },
     {
       name: 'tablet-1024',
+      testIgnore: /chaos-break-tests\.spec\.ts/,
       use: { viewport: { width: 1024, height: 768 } },
     },
     {
       name: 'mobile-390',
+      testIgnore: /chaos-break-tests\.spec\.ts/,
       use: { viewport: { width: 390, height: 844 } },
     },
   ],

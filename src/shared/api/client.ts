@@ -78,7 +78,22 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   const requestId = response.headers.get('X-Request-ID')
   const contentType = response.headers.get('content-type') || ''
   const isJson = contentType.includes('application/json')
-  const payload = isJson ? await response.json().catch(() => null) : await response.text().catch(() => '')
+  const rawText = await response.text().catch(() => '')
+
+  let payload: unknown = rawText
+  let jsonParseFailed = false
+  if (isJson) {
+    if (rawText.trim().length === 0) {
+      payload = null
+    } else {
+      try {
+        payload = JSON.parse(rawText)
+      } catch {
+        payload = null
+        jsonParseFailed = true
+      }
+    }
+  }
 
   if (!response.ok) {
     if (response.status === 401 && !skipAuth) {
@@ -86,6 +101,15 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     }
     const message = extractErrorMessage(payload, `Error HTTP ${response.status}`)
     throw new ApiError(message, response.status, requestId, payload)
+  }
+
+  if (jsonParseFailed) {
+    throw new ApiError(
+      'Respuesta JSON inválida o truncada del servidor.',
+      response.status,
+      requestId,
+      rawText,
+    )
   }
 
   return payload as T

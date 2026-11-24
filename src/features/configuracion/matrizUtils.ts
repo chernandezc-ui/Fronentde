@@ -168,6 +168,17 @@ export function isMatrizBackendVacia(raw: MatrizBiologicaRaw | undefined | null)
   return Object.keys(raw).length === 0
 }
 
+function parsearCeldaNumerica(val: unknown): number | null {
+  if (val === null || val === undefined) return null
+  if (typeof val === 'boolean') return Number.NaN
+  if (typeof val === 'string') {
+    if (val.trim() === '') return Number.NaN
+    return Number(val)
+  }
+  if (typeof val === 'number') return val
+  return Number.NaN
+}
+
 /**
  * Normaliza una matriz (parcial o `{}` desde el backend) a la grilla completa 7x6.
  * Si un estado no viene en `raw`, se inicializa desde `MATRIZ_INPUTS_DEFAULT`.
@@ -188,7 +199,7 @@ export function normalizarMatrizCompleta(
     for (const w of SEMANAS_SIXWEEK) {
       const key = String(w) as SemanaSixWeekKey
       const val = leerSemanaRaw(origen, w)
-      fila[key] = val === null ? null : Number(val)
+      fila[key] = parsearCeldaNumerica(val)
     }
     resultado[estado] = fila
   }

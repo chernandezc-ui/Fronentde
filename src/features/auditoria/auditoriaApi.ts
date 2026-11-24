@@ -1,4 +1,5 @@
 import { API_BASE_URL, ApiError, apiRequest } from '@/shared/api/client'
+import { asArray, asFiniteNumber, asRecord, normalizePaginated } from '@/shared/api/normalize'
 import { useAuthStore } from '@/shared/auth/authStore'
 import {
   buildBitacoraPath,
@@ -16,24 +17,43 @@ import type {
   VentanaResumenDias,
 } from './types'
 
-export function fetchBitacora(params: BitacoraQueryParams): Promise<RespuestaBitacoraPagina> {
-  return apiRequest<RespuestaBitacoraPagina>(buildBitacoraPath(params))
+export async function fetchBitacora(params: BitacoraQueryParams): Promise<RespuestaBitacoraPagina> {
+  const raw = await apiRequest<unknown>(buildBitacoraPath(params))
+  const page = normalizePaginated<LogCargaItem>(raw, params.pagina ?? 1, params.tamano ?? 50)
+  return {
+    items: page.datos,
+    total: page.total,
+    pagina: page.pagina,
+    tamano: page.tamano,
+  }
 }
 
-export function fetchBitacoraResumen(
+export async function fetchBitacoraResumen(
   ventanaDias: VentanaResumenDias,
 ): Promise<RespuestaResumenBitacora> {
-  return apiRequest<RespuestaResumenBitacora>('/api/v1/auditoria/bitacora/resumen', {
-    query: { ventana_dias: ventanaDias },
-  })
+  const raw = asRecord(
+    await apiRequest<unknown>('/api/v1/auditoria/bitacora/resumen', {
+      query: { ventana_dias: ventanaDias },
+    }),
+  )
+  return {
+    ventana_dias: asFiniteNumber(raw.ventana_dias, ventanaDias),
+    total: asFiniteNumber(raw.total, 0),
+    ok: asFiniteNumber(raw.ok, 0),
+    errores: asFiniteNumber(raw.errores, 0),
+    en_proceso: asFiniteNumber(raw.en_proceso, 0),
+    filas_ok: asFiniteNumber(raw.filas_ok, 0),
+    filas_rechazadas: asFiniteNumber(raw.filas_rechazadas, 0),
+    tasa_exito_pct: asFiniteNumber(raw.tasa_exito_pct, 0),
+  }
 }
 
 export function fetchLogDetail(idLog: number): Promise<LogCargaItem> {
   return apiRequest<LogCargaItem>(`/api/v1/auditoria/bitacora/${encodeURIComponent(String(idLog))}`)
 }
 
-export function fetchEtlCatalogFacts(): Promise<EtlFactCatalogItem[]> {
-  return apiRequest<EtlFactCatalogItem[]>('/api/v1/etl/facts')
+export async function fetchEtlCatalogFacts(): Promise<EtlFactCatalogItem[]> {
+  return asArray<EtlFactCatalogItem>(await apiRequest<unknown>('/api/v1/etl/facts'))
 }
 
 export function validateCsvFileApi(

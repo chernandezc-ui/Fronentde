@@ -1,4 +1,5 @@
 import { ApiError, apiRequest } from '@/shared/api/client'
+import { asArray, asFiniteNumber, asOptionalFiniteNumber, asRecord, asString } from '@/shared/api/normalize'
 
 export interface BaseDatosHealth {
   conectado: boolean
@@ -108,8 +109,27 @@ export interface RespuestaAccionAck {
   mensaje: string
 }
 
-export function fetchHealth(): Promise<HealthResponse> {
-  return apiRequest<HealthResponse>('/health')
+function normalizeBaseDatos(raw: unknown): BaseDatosHealth {
+  const obj = asRecord(raw)
+  return {
+    conectado: Boolean(obj.conectado),
+    base_datos: typeof obj.base_datos === 'string' ? obj.base_datos : null,
+    latencia_ms: asOptionalFiniteNumber(obj.latencia_ms),
+    error: typeof obj.error === 'string' ? obj.error : null,
+    version: typeof obj.version === 'string' ? obj.version : null,
+  }
+}
+
+export async function fetchHealth(): Promise<HealthResponse> {
+  const raw = asRecord(await apiRequest<unknown>('/health'))
+  return {
+    servicio: asString(raw.servicio, 'ACP Platform API'),
+    version: asString(raw.version, '—'),
+    entorno: asString(raw.entorno, 'prod'),
+    estado: asString(raw.estado, 'degradado'),
+    base_datos: normalizeBaseDatos(raw.base_datos),
+    timestamp: asString(raw.timestamp, ''),
+  }
 }
 
 /**
@@ -119,8 +139,20 @@ export function fetchHealth(): Promise<HealthResponse> {
  */
 export async function fetchRunnerReady(): Promise<RunnerReadyResponse> {
   try {
-    const data = await apiRequest<Omit<RunnerReadyResponse, 'httpStatus'>>('/health/ready/runner')
-    return { ...data, httpStatus: 200 }
+    const raw = asRecord(await apiRequest<unknown>('/health/ready/runner'))
+    const cp = raw.control_plane && typeof raw.control_plane === 'object'
+      ? (raw.control_plane as RunnerReadyResponse['control_plane'])
+      : undefined
+    return {
+      servicio: asString(raw.servicio) || undefined,
+      version: asString(raw.version) || undefined,
+      entorno: asString(raw.entorno) || undefined,
+      estado: asString(raw.estado, 'desconocido'),
+      base_datos: raw.base_datos ? normalizeBaseDatos(raw.base_datos) : undefined,
+      control_plane: cp,
+      timestamp: asString(raw.timestamp) || undefined,
+      httpStatus: 200,
+    }
   } catch (err) {
     if (
       err instanceof ApiError &&
@@ -142,8 +174,17 @@ export async function fetchRunnerReady(): Promise<RunnerReadyResponse> {
  */
 export async function fetchLockStatus(): Promise<LockStatusResponse> {
   try {
-    const data = await apiRequest<Omit<LockStatusResponse, 'httpStatus'>>('/health/lock')
-    return { ...data, httpStatus: 200 }
+    const raw = asRecord(await apiRequest<unknown>('/health/lock'))
+    return {
+      servicio: asString(raw.servicio) || undefined,
+      version: asString(raw.version) || undefined,
+      entorno: asString(raw.entorno) || undefined,
+      estado: asString(raw.estado, 'desconocido'),
+      base_datos: raw.base_datos ? normalizeBaseDatos(raw.base_datos) : undefined,
+      lock: raw.lock && typeof raw.lock === 'object' ? (raw.lock as LockDetalle) : null,
+      timestamp: asString(raw.timestamp) || undefined,
+      httpStatus: 200,
+    }
   } catch (err) {
     if (
       err instanceof ApiError &&
@@ -159,28 +200,58 @@ export async function fetchLockStatus(): Promise<LockStatusResponse> {
   }
 }
 
-export function fetchCuarentenaResumen(): Promise<CuarentenaResumen> {
-  return apiRequest<CuarentenaResumen>('/api/v1/cuarentena/resumen')
+export async function fetchCuarentenaResumen(): Promise<CuarentenaResumen> {
+  const raw = asRecord(await apiRequest<unknown>('/api/v1/cuarentena/resumen'))
+  return {
+    total: asFiniteNumber(raw.total, 0),
+    pendientes: asFiniteNumber(raw.pendientes, 0),
+    resueltos: asFiniteNumber(raw.resueltos, 0),
+    descartados: asFiniteNumber(raw.descartados, 0),
+  }
 }
 
-export function fetchEtlFallosRecientes(horas = 24): Promise<EtlFallosRecientes> {
-  return apiRequest<EtlFallosRecientes>('/api/v1/etl/fallos-recientes', {
-    query: { horas },
-  })
+export async function fetchEtlFallosRecientes(horas = 24): Promise<EtlFallosRecientes> {
+  const raw = asRecord(
+    await apiRequest<unknown>('/api/v1/etl/fallos-recientes', {
+      query: { horas },
+    }),
+  )
+  return {
+    fallos: asFiniteNumber(raw.fallos, 0),
+    ultimo_fallo_fecha: typeof raw.ultimo_fallo_fecha === 'string' ? raw.ultimo_fallo_fecha : null,
+    ultimo_fallo_tabla: typeof raw.ultimo_fallo_tabla === 'string' ? raw.ultimo_fallo_tabla : null,
+  }
 }
 
-export function fetchEtlResumen(): Promise<EtlResumen> {
-  return apiRequest<EtlResumen>('/api/v1/etl/resumen')
+export async function fetchEtlResumen(): Promise<EtlResumen> {
+  const raw = asRecord(await apiRequest<unknown>('/api/v1/etl/resumen'))
+  return {
+    corridas_activas: asFiniteNumber(raw.corridas_activas, 0),
+    comandos_pendientes: asFiniteNumber(raw.comandos_pendientes, 0),
+    comandos_procesando: asFiniteNumber(raw.comandos_procesando, 0),
+  }
 }
 
-export function fetchAuditoriaResumenBitacora(ventanaDias = 7): Promise<AuditoriaResumenBitacora> {
-  return apiRequest<AuditoriaResumenBitacora>('/api/v1/auditoria/bitacora/resumen', {
-    query: { ventana_dias: ventanaDias },
-  })
+export async function fetchAuditoriaResumenBitacora(ventanaDias = 7): Promise<AuditoriaResumenBitacora> {
+  const raw = asRecord(
+    await apiRequest<unknown>('/api/v1/auditoria/bitacora/resumen', {
+      query: { ventana_dias: ventanaDias },
+    }),
+  )
+  return {
+    ventana_dias: asFiniteNumber(raw.ventana_dias, ventanaDias),
+    total: asFiniteNumber(raw.total, 0),
+    ok: asFiniteNumber(raw.ok, 0),
+    errores: asFiniteNumber(raw.errores, 0),
+    en_proceso: asFiniteNumber(raw.en_proceso, 0),
+    filas_ok: asFiniteNumber(raw.filas_ok, 0),
+    filas_rechazadas: asFiniteNumber(raw.filas_rechazadas, 0),
+    tasa_exito_pct: asFiniteNumber(raw.tasa_exito_pct, 0),
+  }
 }
 
-export function fetchAlertasAcks(): Promise<AlertaAck[]> {
-  return apiRequest<AlertaAck[]>('/api/v1/alertas/acks')
+export async function fetchAlertasAcks(): Promise<AlertaAck[]> {
+  return asArray<AlertaAck>(await apiRequest<unknown>('/api/v1/alertas/acks'))
 }
 
 export function ackAlerta(idAlerta: string, comentario?: string | null): Promise<RespuestaAccionAck> {

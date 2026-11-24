@@ -419,7 +419,7 @@ export function DashboardPage() {
             </h1>
             {healthQuery.data && (
               <StatusBadge
-                label={`${healthQuery.data.entorno.toUpperCase()} · v${healthQuery.data.version}`}
+                label={`${(healthQuery.data.entorno || 'prod').toUpperCase()} · v${healthQuery.data.version || '—'}`}
                 tone="neutral"
                 showDot={false}
               />
@@ -656,7 +656,7 @@ export function DashboardPage() {
                 <span className="text-xs text-muted-foreground">fallos 24h</span>
                 {bitacoraResumenQuery.data && (
                   <span className="metric-value ml-auto font-mono text-xs font-medium text-emerald-700 dark:text-emerald-300">
-                    {bitacoraResumenQuery.data.tasa_exito_pct.toFixed(1)}% OK
+                    {(Number.isFinite(bitacoraResumenQuery.data.tasa_exito_pct) ? bitacoraResumenQuery.data.tasa_exito_pct : 0).toFixed(1)}% OK
                   </span>
                 )}
               </div>
@@ -1140,7 +1140,7 @@ export function DashboardPage() {
                     </span>
                   </span>
                   <span className="metric-value font-mono font-semibold">
-                    {bitacoraResumenQuery.data.tasa_exito_pct.toFixed(1)}%
+                    {(Number.isFinite(bitacoraResumenQuery.data.tasa_exito_pct) ? bitacoraResumenQuery.data.tasa_exito_pct : 0).toFixed(1)}%
                   </span>
                 </div>
                 <Progress value={Math.min(100, Math.max(0, bitacoraResumenQuery.data.tasa_exito_pct))} />

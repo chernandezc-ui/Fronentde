@@ -2,6 +2,7 @@ import { Suspense, lazy } from 'react'
 import { Navigate, createBrowserRouter } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
 import { RequireAuth, RequireRole } from '@/shared/auth/RoleGuard'
+import { RouteErrorBoundary } from '@/shared/components/RouteErrorBoundary'
 import { AppShell } from '@/app/layouts/AppShell'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { DashboardPage } from '@/features/dashboard/DashboardPage'
@@ -45,6 +46,7 @@ export const router = createBrowserRouter([
   {
     path: '/login',
     element: <LoginPage />,
+    errorElement: <RouteErrorBoundary />,
   },
   {
     path: '/',
@@ -53,60 +55,66 @@ export const router = createBrowserRouter([
         <AppShell />
       </RequireAuth>
     ),
+    errorElement: <RouteErrorBoundary />,
     children: [
       {
-        index: true,
-        element: <DashboardPage />,
-      },
-      {
-        path: 'etl',
-        element: (
-          <Suspense fallback={<ModuleRouteFallback />}>
-            <EtlMonitorPage />
-          </Suspense>
-        ),
-      },
-      {
-        path: 'cuarentena',
-        element: (
-          <Suspense fallback={<ModuleRouteFallback />}>
-            <CuarentenaPage />
-          </Suspense>
-        ),
-      },
-      {
-        path: 'maestros',
-        element: (
-          <Suspense fallback={<ModuleRouteFallback />}>
-            <MaestrosPage />
-          </Suspense>
-        ),
-      },
-      {
-        path: 'operarios',
-        element: (
-          <Suspense fallback={<ModuleRouteFallback />}>
-            <OperariosPage />
-          </Suspense>
-        ),
-      },
-      {
-        path: 'configuracion',
-        element: (
-          <RequireRole minRole="analista_mdm">
-            <Suspense fallback={<ModuleRouteFallback />}>
-              <ConfiguracionPage />
-            </Suspense>
-          </RequireRole>
-        ),
-      },
-      {
-        path: 'auditoria',
-        element: (
-          <Suspense fallback={<ModuleRouteFallback />}>
-            <AuditoriaPage />
-          </Suspense>
-        ),
+        errorElement: <RouteErrorBoundary />,
+        children: [
+          {
+            index: true,
+            element: <DashboardPage />,
+          },
+          {
+            path: 'etl',
+            element: (
+              <Suspense fallback={<ModuleRouteFallback />}>
+                <EtlMonitorPage />
+              </Suspense>
+            ),
+          },
+          {
+            path: 'cuarentena',
+            element: (
+              <Suspense fallback={<ModuleRouteFallback />}>
+                <CuarentenaPage />
+              </Suspense>
+            ),
+          },
+          {
+            path: 'maestros',
+            element: (
+              <Suspense fallback={<ModuleRouteFallback />}>
+                <MaestrosPage />
+              </Suspense>
+            ),
+          },
+          {
+            path: 'operarios',
+            element: (
+              <Suspense fallback={<ModuleRouteFallback />}>
+                <OperariosPage />
+              </Suspense>
+            ),
+          },
+          {
+            path: 'configuracion',
+            element: (
+              <RequireRole minRole="analista_mdm">
+                <Suspense fallback={<ModuleRouteFallback />}>
+                  <ConfiguracionPage />
+                </Suspense>
+              </RequireRole>
+            ),
+          },
+          {
+            path: 'auditoria',
+            element: (
+              <Suspense fallback={<ModuleRouteFallback />}>
+                <AuditoriaPage />
+              </Suspense>
+            ),
+          },
+        ],
       },
     ],
   },

@@ -69,7 +69,7 @@ export function isPersonalRelatedColumn(
 export function classifyAsertividad(
   pct: number | null | undefined,
 ): AsertividadClasificacion {
-  if (pct === null || pct === undefined || Number.isNaN(pct)) {
+  if (pct === null || pct === undefined || typeof pct !== 'number' || !Number.isFinite(pct)) {
     return {
       nivel: 'sin_medicion',
       tone: 'neutral',
@@ -135,7 +135,7 @@ export function computeOperariosKpis(
 
   for (const row of rows) {
     const pct = row.pct_asertividad
-    if (pct === null || pct === undefined || Number.isNaN(pct)) {
+    if (pct === null || pct === undefined || typeof pct !== 'number' || !Number.isFinite(pct)) {
       sinMedicion += 1
     } else {
       conMedicion += 1
@@ -148,7 +148,8 @@ export function computeOperariosKpis(
     if (
       row.dias_ausentismo !== null &&
       row.dias_ausentismo !== undefined &&
-      !Number.isNaN(row.dias_ausentismo)
+      typeof row.dias_ausentismo === 'number' &&
+      Number.isFinite(row.dias_ausentismo)
     ) {
       diasAusentismoAcumulados += row.dias_ausentismo
       conAusentismoRegistrado += 1

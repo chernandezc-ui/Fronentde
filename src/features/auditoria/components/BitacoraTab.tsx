@@ -820,7 +820,7 @@ export function BitacoraTab({
                         <TableRow
                           key={row.original.id_log}
                           className={cn(
-                            row.original.estado.toUpperCase() === 'ERROR' && 'bg-rose-500/[0.03]',
+                            (row.original.estado || '').toUpperCase() === 'ERROR' && 'bg-rose-500/[0.03]',
                           )}
                         >
                           {row.getAllCells().map((cell) => (

@@ -1,4 +1,5 @@
 import { apiRequest } from '@/shared/api/client'
+import { asArray, asFiniteNumber, asRecord } from '@/shared/api/normalize'
 import type {
   CorridaActiva,
   CorridaIniciada,
@@ -14,38 +15,62 @@ import type {
   TablePreviewRaw,
 } from './types'
 
-export function fetchFactsCatalog(): Promise<FactDisponible[]> {
-  return apiRequest<FactDisponible[]>('/api/v1/etl/facts')
+export async function fetchFactsCatalog(): Promise<FactDisponible[]> {
+  return asArray<FactDisponible>(await apiRequest<unknown>('/api/v1/etl/facts'))
 }
 
-export function fetchEtlSummary(): Promise<EtlResumen> {
-  return apiRequest<EtlResumen>('/api/v1/etl/resumen')
+export async function fetchEtlSummary(): Promise<EtlResumen> {
+  const raw = asRecord(await apiRequest<unknown>('/api/v1/etl/resumen'))
+  return {
+    corridas_activas: asFiniteNumber(raw.corridas_activas, 0),
+    comandos_pendientes: asFiniteNumber(raw.comandos_pendientes, 0),
+    comandos_procesando: asFiniteNumber(raw.comandos_procesando, 0),
+  }
 }
 
-export function fetchRecentFailures(horas = 24): Promise<FallosRecientes> {
-  return apiRequest<FallosRecientes>('/api/v1/etl/fallos-recientes', {
-    query: { horas },
-  })
+export async function fetchRecentFailures(horas = 24): Promise<FallosRecientes> {
+  const raw = asRecord(
+    await apiRequest<unknown>('/api/v1/etl/fallos-recientes', {
+      query: { horas },
+    }),
+  )
+  return {
+    fallos: asFiniteNumber(raw.fallos, 0),
+    ultimo_fallo_fecha: typeof raw.ultimo_fallo_fecha === 'string' ? raw.ultimo_fallo_fecha : null,
+    ultimo_fallo_tabla: typeof raw.ultimo_fallo_tabla === 'string' ? raw.ultimo_fallo_tabla : null,
+  }
 }
 
-export function fetchRunHistory(limite = 50): Promise<HistorialCorrida[]> {
-  return apiRequest<HistorialCorrida[]>('/api/v1/etl/corridas', {
-    query: { limite },
-  })
+export async function fetchRunHistory(limite = 50): Promise<HistorialCorrida[]> {
+  return asArray<HistorialCorrida>(
+    await apiRequest<unknown>('/api/v1/etl/corridas', {
+      query: { limite },
+    }),
+  )
 }
 
-export function fetchActiveRuns(limite = 50): Promise<CorridaActiva[]> {
-  return apiRequest<CorridaActiva[]>('/api/v1/etl/corridas/activas', {
-    query: { limite },
-  })
+export async function fetchActiveRuns(limite = 50): Promise<CorridaActiva[]> {
+  return asArray<CorridaActiva>(
+    await apiRequest<unknown>('/api/v1/etl/corridas/activas', {
+      query: { limite },
+    }),
+  )
 }
 
-export function fetchRunDetail(idCorrida: string): Promise<DetalleCorrida> {
-  return apiRequest<DetalleCorrida>(`/api/v1/etl/corridas/${encodeURIComponent(idCorrida)}`)
+export async function fetchRunDetail(idCorrida: string): Promise<DetalleCorrida> {
+  const raw = await apiRequest<DetalleCorrida>(`/api/v1/etl/corridas/${encodeURIComponent(idCorrida)}`)
+  const obj = asRecord(raw)
+  return {
+    ...(raw as DetalleCorrida),
+    pasos: asArray<PasoCorrida>(obj.pasos),
+    facts: asArray<string>(obj.facts),
+  }
 }
 
-export function fetchRunSteps(idCorrida: string): Promise<PasoCorrida[]> {
-  return apiRequest<PasoCorrida[]>(`/api/v1/etl/corridas/${encodeURIComponent(idCorrida)}/pasos`)
+export async function fetchRunSteps(idCorrida: string): Promise<PasoCorrida[]> {
+  return asArray<PasoCorrida>(
+    await apiRequest<unknown>(`/api/v1/etl/corridas/${encodeURIComponent(idCorrida)}/pasos`),
+  )
 }
 
 export function startEtlRun(payload: PeticionIniciarCorrida): Promise<CorridaIniciada> {

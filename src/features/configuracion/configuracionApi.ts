@@ -1,8 +1,11 @@
 import { apiRequest } from '@/shared/api/client'
+import { asArray, asFiniteNumber, asRecord, normalizePaginated } from '@/shared/api/normalize'
 import type {
   BatchParametroItem,
   CreateUsuarioPayload,
   MatrizBiologicaRaw,
+  ParametroPipeline,
+  ReglaValidacion,
   RespuestaPaginadaParametros,
   RespuestaPaginadaReglas,
   SaveMatrizResponse,
@@ -14,13 +17,14 @@ import type {
 
 // ── 1. Parámetros del Pipeline ────────────────────────────────────────────────
 
-export function fetchParametros(
+export async function fetchParametros(
   pagina = 1,
   tamano = 200,
 ): Promise<RespuestaPaginadaParametros> {
-  return apiRequest<RespuestaPaginadaParametros>('/api/v1/config/parametros', {
+  const raw = await apiRequest<unknown>('/api/v1/config/parametros', {
     query: { pagina, tamano },
   })
+  return normalizePaginated<ParametroPipeline>(raw, pagina, tamano)
 }
 
 export function updateParametro(
@@ -47,19 +51,29 @@ export function updateParametrosBatch(
 
 // ── 2. Reglas de Validación (solo lectura) ────────────────────────────────────
 
-export function fetchReglas(
+export async function fetchReglas(
   pagina = 1,
   tamano = 50,
 ): Promise<RespuestaPaginadaReglas> {
-  return apiRequest<RespuestaPaginadaReglas>('/api/v1/config/reglas', {
+  const raw = await apiRequest<unknown>('/api/v1/config/reglas', {
     query: { pagina, tamano },
   })
+  const page = normalizePaginated<ReglaValidacion>(raw, pagina, tamano)
+  const rawKpis = asRecord(asRecord(raw).kpis)
+  return {
+    ...page,
+    kpis: {
+      total: asFiniteNumber(rawKpis.total, page.total),
+      activas: asFiniteNumber(rawKpis.activas, 0),
+      inactivas: asFiniteNumber(rawKpis.inactivas, 0),
+    },
+  }
 }
 
 // ── 3. Matriz Biológica Six-Week ──────────────────────────────────────────────
 
-export function fetchMatrizBiologica(): Promise<MatrizBiologicaRaw> {
-  return apiRequest<MatrizBiologicaRaw>('/api/v1/proyecciones/matriz')
+export async function fetchMatrizBiologica(): Promise<MatrizBiologicaRaw> {
+  return asRecord(await apiRequest<unknown>('/api/v1/proyecciones/matriz')) as MatrizBiologicaRaw
 }
 
 export function saveMatrizBiologica(
@@ -73,8 +87,8 @@ export function saveMatrizBiologica(
 
 // ── 4. Usuarios y Roles (solo admin) ──────────────────────────────────────────
 
-export function fetchUsuarios(): Promise<UsuarioAdmin[]> {
-  return apiRequest<UsuarioAdmin[]>('/auth/usuarios')
+export async function fetchUsuarios(): Promise<UsuarioAdmin[]> {
+  return asArray<UsuarioAdmin>(await apiRequest<unknown>('/auth/usuarios'))
 }
 
 export function createUsuario(

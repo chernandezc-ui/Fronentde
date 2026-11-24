@@ -28,7 +28,7 @@ async function seedAuthSession(page: Page) {
 }
 
 async function mockBackendApi(page: Page) {
-  await page.route('http://localhost:8810/**', async (route) => {
+  await page.route(/^https?:\/\/(localhost|127\.0\.0\.1):8810\//, async (route) => {
     const url = new URL(route.request().url())
     const pathname = url.pathname
 

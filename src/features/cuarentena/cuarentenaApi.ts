@@ -1,10 +1,12 @@
 import { apiRequest } from '@/shared/api/client'
+import { asFiniteNumber, asRecord, normalizePaginated } from '@/shared/api/normalize'
 import { buildRechazarPath, buildResolverPath } from './cuarentenaUtils'
 import type {
   CuarentenaResumen,
   EstadoCuarentenaFiltro,
   PeticionRechazarCuarentena,
   PeticionResolverCuarentena,
+  RegistroCuarentena,
   RespuestaAccionCuarentena,
   RespuestaCandidatosReinyeccion,
   RespuestaCuarentenaPaginada,
@@ -18,15 +20,21 @@ export interface ListarCuarentenaParams {
   tabla_filtro?: string
 }
 
-export function fetchCuarentenaResumen(): Promise<CuarentenaResumen> {
-  return apiRequest<CuarentenaResumen>('/api/v1/cuarentena/resumen')
+export async function fetchCuarentenaResumen(): Promise<CuarentenaResumen> {
+  const raw = asRecord(await apiRequest<unknown>('/api/v1/cuarentena/resumen'))
+  return {
+    total: asFiniteNumber(raw.total, 0),
+    pendientes: asFiniteNumber(raw.pendientes, 0),
+    resueltos: asFiniteNumber(raw.resueltos, 0),
+    descartados: asFiniteNumber(raw.descartados, 0),
+  }
 }
 
-export function fetchCuarentenaList(
+export async function fetchCuarentenaList(
   params: ListarCuarentenaParams,
 ): Promise<RespuestaCuarentenaPaginada> {
   const tabla = params.tabla_filtro?.trim()
-  return apiRequest<RespuestaCuarentenaPaginada>('/api/v1/cuarentena', {
+  const raw = await apiRequest<unknown>('/api/v1/cuarentena', {
     query: {
       pagina: params.pagina,
       tamano: params.tamano,
@@ -34,6 +42,7 @@ export function fetchCuarentenaList(
       tabla_filtro: tabla ? tabla : undefined,
     },
   })
+  return normalizePaginated<RegistroCuarentena>(raw, params.pagina, params.tamano)
 }
 
 export function resolverCuarentenaRecord(
@@ -58,15 +67,20 @@ export function rechazarCuarentenaRecord(
   })
 }
 
-export function fetchReinyeccionCandidatos(
+export async function fetchReinyeccionCandidatos(
   tabla?: string,
 ): Promise<RespuestaCandidatosReinyeccion> {
   const cleanTabla = tabla?.trim()
-  return apiRequest<RespuestaCandidatosReinyeccion>('/api/v1/reinyeccion/candidatos', {
-    query: {
-      tabla: cleanTabla ? cleanTabla : undefined,
-    },
-  })
+  const raw = asRecord(
+    await apiRequest<unknown>('/api/v1/reinyeccion/candidatos', {
+      query: {
+        tabla: cleanTabla ? cleanTabla : undefined,
+      },
+    }),
+  )
+  return {
+    candidatos: asFiniteNumber(raw.candidatos, 0),
+  }
 }
 
 export function ejecutarReinyeccionMdm(tabla?: string): Promise<RespuestaReinyeccion> {
