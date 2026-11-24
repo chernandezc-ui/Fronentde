@@ -58,6 +58,7 @@ import {
   useValidateCsvMutation,
 } from '../useAuditoriaQueries'
 import { CsvDiagnosticTable, type DiagnosticViewTab } from './CsvDiagnosticTable'
+import { ExcelUploadPanel } from './ExcelUploadPanel'
 
 interface IngestaTabProps {
   catalogTables: readonly TablaCatalogoOption[]
@@ -260,21 +261,22 @@ export function IngestaTab({ catalogTables, isLoadingCatalog }: IngestaTabProps)
 
   return (
     <div className="space-y-5">
-      {/* Nota honesta obligatoria (Etapa 1) */}
+      {/* Gestor de carga real de Excel (.xlsx) para ETL Bronce (Etapa 2 listo para API) */}
+      <ExcelUploadPanel />
+
+      {/* Nota sobre pre-validador CSV */}
       <Alert className="border-indigo-500/30 bg-indigo-500/6">
         <Info className="size-4 text-indigo-600 dark:text-indigo-400" />
         <AlertTitle className="flex flex-wrap items-center gap-2 text-xs font-semibold text-foreground">
-          <span>Pre-validador preliminar CSV en memoria (Etapa 1)</span>
+          <span>Pre-validador preliminar CSV y Exportación controlada</span>
           <StatusBadge label="Sin inserción en BD" tone="readonly" showDot={false} />
         </AlertTitle>
         <AlertDescription className="text-xs leading-relaxed text-muted-foreground">
           El endpoint <span className="font-mono text-foreground">POST /api/v1/ingesta/validar</span>{' '}
           parsea el CSV en memoria con Polars y ejecuta comprobaciones preliminares.{' '}
           <strong className="text-foreground">
-            No inserta datos en la base de datos ni sustituye los layouts Excel del cargador Bronce.
-          </strong>{' '}
-          La ingesta controlada con <em>staging</em> y confirmación transaccional llegará en{' '}
-          <strong>Etapa 2</strong>.
+            Para alimentar el pipeline completo usa la tarjeta superior de libros Excel (.xlsx).
+          </strong>
         </AlertDescription>
       </Alert>
 

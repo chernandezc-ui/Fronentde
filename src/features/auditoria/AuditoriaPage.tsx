@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useIsFetching, useQueryClient } from '@tanstack/react-query'
-import { FileSpreadsheet, Lock, RefreshCw, ScrollText } from 'lucide-react'
+import { FileSpreadsheet, History, Lock, RefreshCw, ScrollText } from 'lucide-react'
 import { motion, useReducedMotion } from 'motion/react'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -15,6 +15,7 @@ import {
   parseBitacoraSearchParams,
   serializeAuditoriaSearchParams,
 } from './auditoriaUtils'
+import { AccesosTab } from './components/AccesosTab'
 import { BitacoraTab } from './components/BitacoraTab'
 import { IngestaTab } from './components/IngestaTab'
 import type { AuditoriaTabId, BitacoraFiltrosUrl, EtlFactCatalogItem } from './types'
@@ -117,11 +118,11 @@ export function AuditoriaPage() {
         </div>
       </div>
 
-      {/* Tabs sincronizados con ?tab=bitacora|ingesta */}
+      {/* Tabs sincronizados con ?tab=bitacora|ingesta|accesos */}
       <Tabs
         value={activeTab}
         onValueChange={(value) => {
-          if (value === 'bitacora' || value === 'ingesta') {
+          if (value === 'bitacora' || value === 'ingesta' || value === 'accesos') {
             handleTabChange(value)
           }
         }}
@@ -136,6 +137,10 @@ export function AuditoriaPage() {
             <FileSpreadsheet className="size-3.5" />
             Ingesta y Exportación CSV
             {!canIngest && <Lock className="size-3 opacity-65" aria-hidden="true" />}
+          </TabsTrigger>
+          <TabsTrigger value="accesos" className="gap-1.5 px-3">
+            <History className="size-3.5" />
+            Accesos del portal
           </TabsTrigger>
         </TabsList>
 
@@ -153,6 +158,10 @@ export function AuditoriaPage() {
             catalogTables={catalogTables}
             isLoadingCatalog={factsQuery.isLoading}
           />
+        </TabsContent>
+
+        <TabsContent value="accesos">
+          <AccesosTab active={activeTab === 'accesos'} />
         </TabsContent>
       </Tabs>
     </motion.div>

@@ -1,18 +1,34 @@
 import { API_BASE_URL, ApiError, apiRequest } from '@/shared/api/client'
-import { asArray, asFiniteNumber, asRecord, normalizePaginated } from '@/shared/api/normalize'
+import { API_ENDPOINTS } from '@/shared/api/endpoints'
+import {
+  asArray,
+  asFiniteNumber,
+  asOptionalFiniteNumber,
+  asRecord,
+  asString,
+  normalizePaginated,
+} from '@/shared/api/normalize'
 import { useAuthStore } from '@/shared/auth/authStore'
 import {
+  buildAccesosPath,
   buildBitacoraPath,
   buildExportCsvPath,
   parseContentDispositionFilename,
 } from './auditoriaUtils'
 import type {
+  AccesoAuditoriaItem,
+  AccesosQueryParams,
+  ArchivoExcelIngesta,
   BitacoraQueryParams,
   CsvDownloadResult,
+  EstadoCarpetaExcel,
   EtlFactCatalogItem,
   LogCargaItem,
+  RespuestaAccesosPagina,
   RespuestaBitacoraPagina,
+  RespuestaListaExcelIngesta,
   RespuestaResumenBitacora,
+  RespuestaSubirExcel,
   RespuestaValidacionCsv,
   VentanaResumenDias,
 } from './types'
@@ -154,5 +170,87 @@ export async function downloadTableCsv(tabla: string): Promise<CsvDownloadResult
     filename,
     sizeBytes: blob.size,
     tabla: cleanTabla,
+  }
+}
+
+export async function fetchExcelIngestaArchivos(
+  estado: EstadoCarpetaExcel = 'entrada',
+): Promise<RespuestaListaExcelIngesta> {
+  const raw = asRecord(
+    await apiRequest<unknown>(API_ENDPOINTS.ingesta.excelArchivos, {
+      query: { estado },
+    }),
+  )
+  return {
+    carpetas: asArray<string>(raw.carpetas),
+    archivos: asArray<ArchivoExcelIngesta>(raw.archivos),
+  }
+}
+
+export async function uploadExcelIngestaFile(input: {
+  file: File
+  carpetaDestino?: string
+  sobreescribir?: boolean
+}): Promise<RespuestaSubirExcel> {
+  const formData = new FormData()
+  formData.append('archivo', input.file)
+  if (input.carpetaDestino && input.carpetaDestino !== 'AUTO') {
+    formData.append('carpeta_destino', input.carpetaDestino)
+  }
+  formData.append('sobreescribir', String(Boolean(input.sobreescribir)))
+
+  return apiRequest<RespuestaSubirExcel>(API_ENDPOINTS.ingesta.excelSubir, {
+    method: 'POST',
+    body: formData,
+  })
+}
+
+export function deleteExcelIngestaFile(
+  carpeta: string,
+  nombre: string,
+): Promise<{ ok?: boolean; mensaje: string }> {
+  return apiRequest<{ ok?: boolean; mensaje: string }>(API_ENDPOINTS.ingesta.excelEliminar, {
+    method: 'DELETE',
+    query: { carpeta, nombre },
+  })
+}
+
+function normalizeAccesoAuditoriaItem(
+  raw: unknown,
+  fallbackIndex: number,
+): AccesoAuditoriaItem {
+  const rec = asRecord(raw)
+  const rawId = rec.id_acceso ?? rec.id
+  const idAcceso =
+    typeof rawId === 'number' || typeof rawId === 'string'
+      ? rawId
+      : `acceso-${fallbackIndex}`
+
+  return {
+    id_acceso: idAcceso,
+    fecha: typeof rec.fecha === 'string' ? rec.fecha : typeof rec.timestamp === 'string' ? rec.timestamp : null,
+    nombre_usuario: asString(rec.nombre_usuario ?? rec.usuario, '—'),
+    rol: typeof rec.rol === 'string' ? rec.rol : null,
+    accion: asString(rec.accion ?? rec.evento, 'EVENTO'),
+    modulo: typeof rec.modulo === 'string' ? rec.modulo : null,
+    metodo: typeof rec.metodo === 'string' ? rec.metodo : null,
+    ruta: typeof rec.ruta === 'string' ? rec.ruta : typeof rec.endpoint === 'string' ? rec.endpoint : null,
+    estado_http: asOptionalFiniteNumber(rec.estado_http ?? rec.status_code),
+    ip: typeof rec.ip === 'string' ? rec.ip : typeof rec.ip_cliente === 'string' ? rec.ip_cliente : null,
+    request_id: typeof rec.request_id === 'string' ? rec.request_id : null,
+    detalle: typeof rec.detalle === 'string' ? rec.detalle : null,
+  }
+}
+
+export async function fetchAuditoriaAccesos(
+  params: AccesosQueryParams,
+): Promise<RespuestaAccesosPagina> {
+  const raw = await apiRequest<unknown>(buildAccesosPath(params))
+  const page = normalizePaginated<unknown>(raw, params.pagina ?? 1, params.tamano ?? 50)
+  return {
+    items: page.datos.map((item, idx) => normalizeAccesoAuditoriaItem(item, idx)),
+    total: page.total,
+    pagina: page.pagina,
+    tamano: page.tamano,
   }
 }

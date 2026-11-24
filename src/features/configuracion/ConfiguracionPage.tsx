@@ -158,7 +158,10 @@ export function ConfiguracionPage() {
           </TabsContent>
 
           <TabsContent value="reglas">
-            <ReglasTab active={activeTab === 'reglas'} />
+            <ReglasTab
+              active={activeTab === 'reglas'}
+              canEdit={canEditConfig}
+            />
           </TabsContent>
 
           <TabsContent value="usuarios">

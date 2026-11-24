@@ -16,12 +16,17 @@ import {
   PARAMETRO_VALOR_MAX,
   USUARIO_CLAVE_MIN,
   USUARIO_NOMBRE_MIN,
+  biologiaConstantesSchema,
   clasificarGrupoParametro,
   createUsuarioFormSchema,
   createUsuarioSchema,
+  editUsuarioFormSchema,
   parametroValorSchema,
   parseConfiguracionTab,
+  reglaFormSchema,
+  resetClaveFormSchema,
   toCreateUsuarioPayload,
+  toUpdateUsuarioPayload,
 } from './schemas'
 
 describe('configuracion — matriz biológica Six-Week', () => {
@@ -280,6 +285,66 @@ describe('configuracion — Zod schemas de creación de usuario', () => {
         email: '',
         clave: 'Password123!',
         rol: 'superadmin',
+      }).success,
+    ).toBe(false)
+  })
+
+  it('validates Stage 2 reglaFormSchema, biologiaConstantesSchema, editUsuario and resetClave', () => {
+    expect(
+      reglaFormSchema.safeParse({
+        tabla_destino: 'Silver.Fact_Cosecha',
+        columna: 'Kilos',
+        tipo_validacion: 'rango',
+        valor_min: 100,
+        valor_max: 50,
+        accion: 'cuarentena',
+        activo: true,
+      }).success,
+    ).toBe(false)
+
+    const validRegla = reglaFormSchema.parse({
+      tabla_destino: ' Silver.Fact_Cosecha ',
+      columna: ' Kilos ',
+      tipo_validacion: 'rango',
+      valor_min: 0,
+      valor_max: 500,
+      accion: 'cuarentena',
+      activo: true,
+    })
+    expect(validRegla.tipo_validacion).toBe('RANGO')
+    expect(validRegla.accion).toBe('CUARENTENA')
+
+    expect(
+      biologiaConstantesSchema.safeParse({
+        plantas_por_punto: 10,
+        decay_factor: { '1': 1, '2': 1, '3': 0.8, '4': 0.8, '5': 0.8, '6': 0.8 },
+        delta_productivas: { '1': 0, '2': 0.02, '3': 0, '4': -0.03, '5': 0.01, '6': 0.01 },
+      }).success,
+    ).toBe(true)
+
+    expect(
+      biologiaConstantesSchema.safeParse({
+        plantas_por_punto: 0,
+        decay_factor: { '1': 1, '2': 1, '3': 0.8, '4': 0.8, '5': 0.8, '6': 0.8 },
+        delta_productivas: { '1': 0, '2': 0.02, '3': 0, '4': -0.03, '5': 0.01, '6': 0.01 },
+      }).success,
+    ).toBe(false)
+
+    const updatedUser = editUsuarioFormSchema.parse({
+      nombre_display: ' Lucía Paredes ',
+      email: ' ',
+      rol: 'operador_etl',
+    })
+    expect(toUpdateUsuarioPayload(updatedUser)).toEqual({
+      nombre_display: 'Lucía Paredes',
+      email: null,
+      rol: 'operador_etl',
+    })
+
+    expect(
+      resetClaveFormSchema.safeParse({
+        nueva_clave: 'Password99!',
+        confirmar_clave: 'Mismatch99!',
       }).success,
     ).toBe(false)
   })

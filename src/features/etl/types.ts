@@ -65,6 +65,8 @@ export interface PasoCorrida {
   fecha_inicio: string | null
   fecha_fin: string | null
   mensaje_error: string | null
+  filas_procesadas?: number
+  filas_rechazadas?: number
 }
 
 export interface DetalleCorrida {

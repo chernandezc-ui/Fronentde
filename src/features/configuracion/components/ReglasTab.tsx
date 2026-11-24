@@ -15,6 +15,8 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  Pencil,
+  Plus,
   RefreshCw,
   Search,
   ShieldCheck,
@@ -32,6 +34,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Switch } from '@/components/ui/switch'
 import {
   Table,
   TableBody,
@@ -44,8 +47,10 @@ import { cn } from '@/lib/utils'
 import { ApiErrorBanner } from '@/shared/components/ApiErrorBanner'
 import { StatusBadge, type OperationalTone } from '@/shared/components/StatusBadge'
 import { formatNumber } from '@/shared/lib/format'
+import { getReglaClave } from '../schemas'
 import type { ReglaValidacion } from '../types'
-import { useReglas } from '../useConfiguracionQueries'
+import { useReglas, useUpdateReglaMutation } from '../useConfiguracionQueries'
+import { ReglaFormDialog } from './ReglaFormDialog'
 
 type EstadoReglaFiltro = 'TODAS' | 'ACTIVAS' | 'INACTIVAS'
 
@@ -97,16 +102,23 @@ function mapAccionToTone(accion: string | null | undefined): OperationalTone {
 
 interface ReglasTabProps {
   active: boolean
+  canEdit: boolean
 }
 
-export function ReglasTab({ active }: ReglasTabProps) {
+export function ReglasTab({ active, canEdit }: ReglasTabProps) {
   const [pagina, setPagina] = useState(1)
   const [tamano, setTamano] = useState<number>(50)
   const [searchText, setSearchText] = useState('')
   const [estadoFiltro, setEstadoFiltro] = useState<EstadoReglaFiltro>('TODAS')
   const [sorting, setSorting] = useState<SortingState>([])
+  const [formState, setFormState] = useState<{
+    open: boolean
+    item: ReglaValidacion | null
+  }>({ open: false, item: null })
+  const [togglingKey, setTogglingKey] = useState<string | null>(null)
 
   const query = useReglas(pagina, tamano, active)
+  const updateMutation = useUpdateReglaMutation()
   const rows = query.data?.datos ?? EMPTY_REGLAS
   const totalReglas = query.data?.total ?? 0
   const kpis = query.data?.kpis ?? { total: 0, activas: 0, inactivas: 0 }
@@ -210,8 +222,61 @@ export function ReglasTab({ active }: ReglasTabProps) {
               <StatusBadge label="INACTIVA" tone="cancelled" />
             ),
         }),
+        ...(canEdit
+          ? [
+              columnHelper.display({
+                id: 'acciones',
+                header: () => <span className="block text-right">Acciones</span>,
+                cell: (info) => {
+                  const row = info.row.original
+                  const clave = getReglaClave(row)
+                  const isBusy =
+                    updateMutation.isPending && togglingKey === clave
+                  return (
+                    <div className="flex items-center justify-end gap-2">
+                      <Switch
+                        size="sm"
+                        checked={row.activo}
+                        disabled={isBusy}
+                        aria-label={`Alternar estado de regla ${row.tabla_destino ?? ''} ${row.columna ?? ''}`}
+                        onCheckedChange={(checked) => {
+                          setTogglingKey(clave)
+                          updateMutation.mutate(
+                            {
+                              clave,
+                              payload: {
+                                tabla_destino: row.tabla_destino ?? '',
+                                columna: row.columna ?? '',
+                                tipo_validacion: row.tipo_validacion ?? 'RANGO',
+                                valor_min: row.valor_min,
+                                valor_max: row.valor_max,
+                                accion: row.accion ?? 'CUARENTENA',
+                                activo: checked,
+                              },
+                            },
+                            {
+                              onSettled: () => setTogglingKey(null),
+                            },
+                          )
+                        }}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="xs"
+                        onClick={() => setFormState({ open: true, item: row })}
+                      >
+                        <Pencil className="size-3" />
+                        Editar
+                      </Button>
+                    </div>
+                  )
+                },
+              }),
+            ]
+          : []),
       ]),
-    [],
+    [canEdit, togglingKey, updateMutation],
   )
 
   const table = useTable(
@@ -312,7 +377,7 @@ export function ReglasTab({ active }: ReglasTabProps) {
               <CardTitle className="text-sm font-semibold">
                 Reglas de Validación (Config.Reglas_Validacion)
               </CardTitle>
-              <StatusBadge label="Solo lectura · Etapa 2" tone="readonly" />
+              {!canEdit && <StatusBadge label="Solo lectura" tone="readonly" />}
               <Badge
                 variant="secondary"
                 className="font-mono text-[11px] tabular-nums"
@@ -323,6 +388,16 @@ export function ReglasTab({ active }: ReglasTabProps) {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              {canEdit && (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => setFormState({ open: true, item: null })}
+                >
+                  <Plus className="size-3.5" />
+                  Nueva regla
+                </Button>
+              )}
               <Select
                 value={String(tamano)}
                 onValueChange={(val) => {
@@ -540,6 +615,17 @@ export function ReglasTab({ active }: ReglasTabProps) {
           )}
         </CardContent>
       </Card>
+
+      <ReglaFormDialog
+        open={formState.open}
+        item={formState.item}
+        onOpenChange={(open) =>
+          setFormState((prev) => ({
+            open,
+            item: open ? prev.item : null,
+          }))
+        }
+      />
     </div>
   )
 }

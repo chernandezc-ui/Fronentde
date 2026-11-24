@@ -8,6 +8,21 @@ export interface OperarioPersonal {
   id_planilla: string | null
   pct_asertividad: number | null
   dias_ausentismo: number | null
+  es_activo?: boolean | null
+}
+
+export interface UpsertOperarioPayload {
+  dni: string
+  nombre_completo: string
+  rol: string | null
+  sexo: string | null
+  id_planilla: string | null
+  es_activo: boolean
+}
+
+export interface OperarioMutationResponse {
+  ok?: boolean
+  mensaje: string
 }
 
 export interface PaginatedPersonalResponse {

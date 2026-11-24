@@ -13,6 +13,8 @@ import {
   ArrowUp,
   ArrowUpDown,
   CheckCircle2,
+  KeyRound,
+  Pencil,
   Power,
   RefreshCw,
   RotateCcw,
@@ -59,6 +61,8 @@ import {
 } from '../useConfiguracionQueries'
 import { ConfirmUserToggleDialog } from './ConfirmUserToggleDialog'
 import { CreateUserDialog } from './CreateUserDialog'
+import { EditUserDialog } from './EditUserDialog'
+import { ResetUserPasswordDialog } from './ResetUserPasswordDialog'
 
 type EstadoUsuarioFiltro = 'TODOS' | 'ACTIVOS' | 'INACTIVOS'
 
@@ -169,6 +173,8 @@ function UsuariosAdminPanel({
   const [sorting, setSorting] = useState<SortingState>([])
   const [createOpen, setCreateOpen] = useState(false)
   const [toggleTarget, setToggleTarget] = useState<UsuarioAdmin | null>(null)
+  const [editTarget, setEditTarget] = useState<UsuarioAdmin | null>(null)
+  const [resetTarget, setResetTarget] = useState<UsuarioAdmin | null>(null)
 
   const query = useUsuarios(active)
   const toggleMutation = useToggleUsuarioEstadoMutation()
@@ -314,9 +320,27 @@ function UsuariosAdminPanel({
               row.nombre_usuario.toLowerCase() === normalizedCurrentUser
             const isSelfActive = isSelf && row.es_activo
 
-            if (isSelfActive) {
-              return (
-                <div className="flex justify-end">
+            return (
+              <div className="flex flex-wrap items-center justify-end gap-1.5">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => setEditTarget(row)}
+                >
+                  <Pencil className="size-3" />
+                  Editar
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => setResetTarget(row)}
+                >
+                  <KeyRound className="size-3" />
+                  Clave
+                </Button>
+                {isSelfActive ? (
                   <Tooltip>
                     <TooltipTrigger
                       render={
@@ -335,33 +359,29 @@ function UsuariosAdminPanel({
                       No puedes desactivar tu propia cuenta en sesión activa.
                     </TooltipContent>
                   </Tooltip>
-                </div>
-              )
-            }
-
-            return (
-              <div className="flex justify-end">
-                <Button
-                  variant={row.es_activo ? 'outline' : 'secondary'}
-                  size="xs"
-                  onClick={() => setToggleTarget(row)}
-                  className={cn(
-                    row.es_activo &&
-                      'text-rose-700 hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-700 dark:text-rose-300 dark:hover:text-rose-200',
-                  )}
-                >
-                  {row.es_activo ? (
-                    <>
-                      <Power className="size-3" />
-                      Desactivar
-                    </>
-                  ) : (
-                    <>
-                      <RotateCcw className="size-3" />
-                      Activar
-                    </>
-                  )}
-                </Button>
+                ) : (
+                  <Button
+                    variant={row.es_activo ? 'outline' : 'secondary'}
+                    size="xs"
+                    onClick={() => setToggleTarget(row)}
+                    className={cn(
+                      row.es_activo &&
+                        'text-rose-700 hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-700 dark:text-rose-300 dark:hover:text-rose-200',
+                    )}
+                  >
+                    {row.es_activo ? (
+                      <>
+                        <Power className="size-3" />
+                        Desactivar
+                      </>
+                    ) : (
+                      <>
+                        <RotateCcw className="size-3" />
+                        Activar
+                      </>
+                    )}
+                  </Button>
+                )}
               </div>
             )
           },
@@ -679,6 +699,17 @@ function UsuariosAdminPanel({
       </Card>
 
       <CreateUserDialog open={createOpen} onOpenChange={setCreateOpen} />
+
+      <EditUserDialog
+        user={editTarget}
+        currentUsername={currentUsername}
+        onClose={() => setEditTarget(null)}
+      />
+
+      <ResetUserPasswordDialog
+        user={resetTarget}
+        onClose={() => setResetTarget(null)}
+      />
 
       <ConfirmUserToggleDialog
         target={toggleTarget}

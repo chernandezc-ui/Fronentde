@@ -62,6 +62,7 @@ import {
   type AlertaAck,
 } from '@/features/dashboard/dashboardApi'
 import { useTelemetryStream, type TelemetrySample } from '@/features/dashboard/useTelemetryStream'
+import { useCalidadStream } from '@/features/dashboard/useCalidadStream'
 
 interface DerivedAlert {
   id: string
@@ -148,8 +149,9 @@ export function DashboardPage() {
   const [ackTarget, setAckTarget] = useState<DerivedAlert | null>(null)
   const [ackComment, setAckComment] = useState('')
 
-  // Stream SSE compartido (telemetría cada 3s)
+  // Streams SSE en vivo (telemetría cada 3s + calidad cada 10s)
   const telemetry = useTelemetryStream(true)
+  const calidad = useCalidadStream(true)
 
   // Consultas REST reales del backend
   const healthQuery = useQuery({
@@ -369,6 +371,9 @@ export function DashboardPage() {
     if (telemetry.status === 'error' || telemetry.status === 'closed') {
       telemetry.reconnect()
     }
+    if (calidad.status === 'error' || calidad.status === 'closed') {
+      calidad.reconnect()
+    }
   }
 
   // Valores combinados (SSE prioritario para métricas en vivo, fallback a REST)
@@ -404,6 +409,26 @@ export function DashboardPage() {
             : telemetry.status === 'closed'
               ? 'CERRADO'
               : 'INACTIVO'
+
+  const calidadBadgeTone: OperationalTone =
+    calidad.status === 'open'
+      ? 'ok'
+      : calidad.status === 'connecting' || calidad.status === 'reconnecting'
+        ? 'pending'
+        : calidad.status === 'error'
+          ? 'error'
+          : 'neutral'
+
+  const calidadBadgeLabel =
+    calidad.status === 'open'
+      ? 'CALIDAD EN VIVO'
+      : calidad.status === 'connecting'
+        ? 'CONECTANDO'
+        : calidad.status === 'reconnecting'
+          ? 'RECONECTANDO'
+          : calidad.status === 'error'
+            ? 'ERROR SSE'
+            : 'INACTIVO'
 
   const lockInfo = lockQuery.data?.lock
   const lockEstadoDisplay = lockInfo?.estado_lock ?? (lockQuery.data?.estado ? lockQuery.data.estado.toUpperCase() : null)
@@ -1052,6 +1077,128 @@ export function DashboardPage() {
           </Card>
         </div>
       </div>
+
+      {/* Calidad de Datos en Vivo (SSE /health/calidad/stream) */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <ShieldAlert className="size-4 text-muted-foreground" />
+                Calidad de Datos en Vivo (Bronce.Seguimiento_Errores)
+              </CardTitle>
+              <CardDescription>
+                Canal `/health/calidad/stream` · pulso cada 10s con top tipos de error y fundos afectados hoy.
+              </CardDescription>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {calidad.latest?.timestamp_servidor && (
+                <span className="metric-value font-mono text-[11px] text-muted-foreground">
+                  {formatDateTime(calidad.latest.timestamp_servidor)}
+                </span>
+              )}
+              <StatusBadge label={calidadBadgeLabel} tone={calidadBadgeTone} />
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {!calidad.latest ? (
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-dashed bg-muted/20 px-4 py-5 text-xs text-muted-foreground">
+              <span>
+                {calidad.lastError
+                  ? `Stream de calidad interrumpido: ${calidad.lastError}`
+                  : 'Esperando primera muestra en vivo desde /health/calidad/stream…'}
+              </span>
+              {(calidad.status === 'error' || calidad.status === 'closed') && (
+                <Button variant="outline" size="xs" onClick={calidad.reconnect}>
+                  Reconectar
+                </Button>
+              )}
+            </div>
+          ) : (
+            <div className="grid gap-4 lg:grid-cols-12">
+              <div className="flex flex-col justify-between rounded-lg border bg-muted/25 p-3.5 lg:col-span-3">
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">Errores detectados hoy</p>
+                  <p
+                    className={`metric-value font-mono text-3xl font-semibold tracking-tight ${
+                      calidad.latest.total_hoy > 0
+                        ? 'text-amber-600 dark:text-amber-400'
+                        : 'text-emerald-700 dark:text-emerald-400'
+                    }`}
+                  >
+                    {formatNumber(calidad.latest.total_hoy)}
+                  </p>
+                </div>
+                <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Incidencias en capa Bronce</span>
+                  <Link
+                    to="/cuarentena"
+                    className="inline-flex items-center gap-0.5 font-medium text-foreground hover:underline"
+                  >
+                    Cuarentena
+                    <ArrowUpRight className="size-3" />
+                  </Link>
+                </div>
+              </div>
+
+              <div className="rounded-lg border bg-muted/15 p-3.5 lg:col-span-5">
+                <p className="mb-2.5 text-xs font-semibold text-foreground">Top 3 Tipos de Error hoy</p>
+                {calidad.latest.top_tipos.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">Sin errores por tipo registrados en la fecha.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {calidad.latest.top_tipos.map((item, idx) => {
+                      const maxVal = Math.max(1, ...calidad.latest!.top_tipos.map((t) => t.cuenta))
+                      const pct = Math.min(100, Math.round((item.cuenta / maxVal) * 100))
+                      return (
+                        <div key={`${item.etiqueta}-${idx}`} className="space-y-1">
+                          <div className="flex items-center justify-between gap-2 text-xs">
+                            <span className="truncate font-mono text-foreground" title={item.etiqueta}>
+                              {item.etiqueta}
+                            </span>
+                            <span className="metric-value shrink-0 font-mono font-semibold text-muted-foreground">
+                              {formatNumber(item.cuenta)}
+                            </span>
+                          </div>
+                          <Progress value={pct} />
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-lg border bg-muted/15 p-3.5 lg:col-span-4">
+                <p className="mb-2.5 text-xs font-semibold text-foreground">Top 3 Fundos afectados</p>
+                {calidad.latest.top_fundos.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">Sin fundos con observaciones hoy.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {calidad.latest.top_fundos.map((item, idx) => {
+                      const maxVal = Math.max(1, ...calidad.latest!.top_fundos.map((f) => f.cuenta))
+                      const pct = Math.min(100, Math.round((item.cuenta / maxVal) * 100))
+                      return (
+                        <div key={`${item.etiqueta}-${idx}`} className="space-y-1">
+                          <div className="flex items-center justify-between gap-2 text-xs">
+                            <span className="truncate font-mono text-foreground" title={item.etiqueta}>
+                              {item.etiqueta}
+                            </span>
+                            <span className="metric-value shrink-0 font-mono font-semibold text-muted-foreground">
+                              {formatNumber(item.cuenta)}
+                            </span>
+                          </div>
+                          <Progress value={pct} />
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Resumen de Bitácora DWH (ventana 7 días) */}
       <Card>

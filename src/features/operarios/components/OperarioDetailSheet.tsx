@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import {
   AlertCircle,
   CheckCircle2,
@@ -7,6 +7,7 @@ import {
   Pencil,
   RefreshCw,
   ShieldAlert,
+  UserCheck,
   UserRound,
   UserX,
 } from 'lucide-react'
@@ -23,12 +24,8 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
+import { API_ENDPOINTS, isEndpointNotImplementedError } from '@/shared/api/endpoints'
 import { ApiErrorBanner } from '@/shared/components/ApiErrorBanner'
 import { StatusBadge } from '@/shared/components/StatusBadge'
 import { formatNumber } from '@/shared/lib/format'
@@ -38,39 +35,72 @@ import {
   matchOperarioIncidencias,
 } from '../operariosUtils'
 import type { CuarentenaIncidencia, OperarioPersonal } from '../types'
-import { useCuarentenaSnapshot } from '../useOperariosQueries'
+import { useCuarentenaSnapshot, useOperarioIncidencias } from '../useOperariosQueries'
 import { AsertividadMeter } from './AsertividadMeter'
+import { ConfirmOperarioToggleDialog } from './ConfirmOperarioToggleDialog'
+import { OperarioFormDialog } from './OperarioFormDialog'
 
 const EMPTY_CUARENTENA: CuarentenaIncidencia[] = []
 
 interface OperarioDetailSheetProps {
   operario: OperarioPersonal | null
+  canManage?: boolean
   onOpenChange: (open: boolean) => void
 }
 
 export function OperarioDetailSheet({
   operario,
+  canManage = false,
   onOpenChange,
 }: OperarioDetailSheetProps) {
-  const cuarentenaQuery = useCuarentenaSnapshot(Boolean(operario), 200)
+  const [editOpen, setEditOpen] = useState(false)
+  const [toggleOpen, setToggleOpen] = useState(false)
+
+  const dedicatedQuery = useOperarioIncidencias(operario?.dni, Boolean(operario?.dni))
+  const dedicatedNotReady =
+    !operario?.dni ||
+    (dedicatedQuery.isError && isEndpointNotImplementedError(dedicatedQuery.error))
+
+  const cuarentenaQuery = useCuarentenaSnapshot(Boolean(operario) && dedicatedNotReady, 200)
   const snapshotRows = cuarentenaQuery.data?.datos ?? EMPTY_CUARENTENA
   const totalCuarentena = cuarentenaQuery.data?.total ?? 0
 
-  const incidenciasMatches = useMemo(() => {
-    if (!operario) return []
+  const dedicatedMatches = useMemo(() => {
+    const rows = dedicatedQuery.data?.datos ?? EMPTY_CUARENTENA
+    return rows.map((inc) => ({
+      incidencia: inc,
+      matchReason: 'dni' as const,
+      matchLabel: 'Coincidencia server-side por DNI',
+      isPersonalColumn: true,
+    }))
+  }, [dedicatedQuery.data?.datos])
+
+  const fallbackMatches = useMemo(() => {
+    if (!operario || !dedicatedNotReady) return []
     return matchOperarioIncidencias(operario, snapshotRows)
-  }, [operario, snapshotRows])
+  }, [operario, dedicatedNotReady, snapshotRows])
+
+  const incidenciasMatches = dedicatedNotReady ? fallbackMatches : dedicatedMatches
 
   const personalColumnsCount = useMemo(
     () => countPersonalColumnIncidencias(snapshotRows),
     [snapshotRows],
   )
 
+  const activeQueryLoading = dedicatedNotReady
+    ? dedicatedQuery.isLoading || cuarentenaQuery.isLoading
+    : dedicatedQuery.isLoading
+  const activeQueryFetching = dedicatedQuery.isFetching || cuarentenaQuery.isFetching
+  const activeQueryError = dedicatedNotReady ? cuarentenaQuery.isError : dedicatedQuery.isError
+  const activeErrorObj = dedicatedNotReady ? cuarentenaQuery.error : dedicatedQuery.error
+
   const handleCopyDni = () => {
     if (!operario?.dni) return
     void navigator.clipboard.writeText(operario.dni)
     toast.success('DNI copiado al portapapeles')
   }
+
+  const isOperarioActivo = operario?.es_activo ?? true
 
   return (
     <Sheet open={Boolean(operario)} onOpenChange={onOpenChange}>
@@ -84,7 +114,10 @@ export function OperarioDetailSheet({
             <SheetTitle className="text-sm font-semibold">
               {operario?.nombre_completo || 'Operario sin nombre registrado'}
             </SheetTitle>
-            <StatusBadge label="Solo lectura · Etapa 2" tone="readonly" />
+            <StatusBadge
+              label={isOperarioActivo ? 'ACTIVO' : 'INACTIVO'}
+              tone={isOperarioActivo ? 'ok' : 'cancelled'}
+            />
           </div>
           <SheetDescription className="flex flex-wrap items-center gap-2 pt-1 text-xs">
             <span className="font-mono text-foreground">
@@ -192,36 +225,44 @@ export function OperarioDetailSheet({
               <div className="flex flex-wrap items-center gap-2">
                 <ShieldAlert className="size-4 text-muted-foreground" />
                 <h2 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                  Incidencias detectadas en Cuarentena (cruce Etapa 1)
+                  {dedicatedNotReady
+                    ? 'Incidencias detectadas en Cuarentena (fallback 200 reg.)'
+                    : 'Incidencias por DNI (server-side)'}
                 </h2>
               </div>
               <Button
                 type="button"
                 variant="outline"
                 size="xs"
-                onClick={() => void cuarentenaQuery.refetch()}
-                disabled={cuarentenaQuery.isFetching}
+                onClick={() => {
+                  if (operario?.dni) void dedicatedQuery.refetch()
+                  if (dedicatedNotReady) void cuarentenaQuery.refetch()
+                }}
+                disabled={activeQueryFetching}
               >
                 <RefreshCw
                   className={cn(
                     'size-3',
-                    cuarentenaQuery.isFetching && 'animate-spin',
+                    activeQueryFetching && 'animate-spin',
                   )}
                 />
                 Revalidar
               </Button>
             </div>
 
-            {cuarentenaQuery.isLoading ? (
+            {activeQueryLoading ? (
               <div className="space-y-2">
                 <Skeleton className="h-16 w-full" />
                 <Skeleton className="h-16 w-full" />
               </div>
-            ) : cuarentenaQuery.isError ? (
+            ) : activeQueryError ? (
               <ApiErrorBanner
-                error={cuarentenaQuery.error}
-                title="No se pudo consultar MDM.Cuarentena para cruzar incidencias"
-                onRetry={() => void cuarentenaQuery.refetch()}
+                error={activeErrorObj}
+                title="No se pudo consultar incidencias de cuarentena"
+                onRetry={() => {
+                  if (operario?.dni) void dedicatedQuery.refetch()
+                  if (dedicatedNotReady) void cuarentenaQuery.refetch()
+                }}
               />
             ) : (
               <>
@@ -233,9 +274,9 @@ export function OperarioDetailSheet({
                     </strong>
                   </span>
                   <span className="font-mono text-[11px] tabular-nums">
-                    Muestra inspeccionada: {formatNumber(snapshotRows.length)}{' '}
-                    de {formatNumber(totalCuarentena)} ({personalColumnsCount}{' '}
-                    en columnas de personal/DNI)
+                    {dedicatedNotReady
+                      ? `Muestra local: ${formatNumber(snapshotRows.length)} de ${formatNumber(totalCuarentena)} (${personalColumnsCount} personal)`
+                      : `Total server-side: ${formatNumber(dedicatedQuery.data?.total ?? incidenciasMatches.length)}`}
                   </span>
                 </div>
 
@@ -334,64 +375,65 @@ export function OperarioDetailSheet({
               </>
             )}
 
-            {/* Honest Stage 2 roadmap disclaimer */}
-            <div className="flex items-start gap-2 rounded-lg border border-indigo-500/25 bg-indigo-500/6 px-3 py-2.5 text-[11px] leading-relaxed text-muted-foreground">
-              <Info className="mt-0.5 size-3.5 shrink-0 text-indigo-600 dark:text-indigo-400" />
-              <p>
-                <span className="font-semibold text-foreground">
-                  Alcance Etapa 1:
-                </span>{' '}
-                Este cruce se ejecuta localmente sobre los primeros 200 registros de{' '}
-                <span className="font-mono">GET /api/v1/cuarentena</span>. El historial completo server-side de errores por operario (
-                <span className="font-mono">Fact_Tareo</span> +{' '}
-                <span className="font-mono">MDM.Cuarentena</span> indexado por DNI) y las operaciones CRUD sobre{' '}
-                <span className="font-mono">Silver.Dim_Personal</span> se habilitarán en la Etapa 2 del backend.
-              </p>
-            </div>
+            {dedicatedNotReady && (
+              <div className="flex items-start gap-2 rounded-lg border border-amber-500/35 bg-amber-500/8 px-3 py-2.5 text-[11px] leading-relaxed text-muted-foreground">
+                <Info className="mt-0.5 size-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                <p>
+                  <span className="font-semibold text-foreground">Fallback local (200 reg.):</span>{' '}
+                  Esperando el endpoint dedicado{' '}
+                  <span className="font-mono text-foreground">
+                    GET {operario?.dni ? API_ENDPOINTS.operarios.personalIncidencias(operario.dni) : '/api/v1/catalogos/personal/{dni}/incidencias'}
+                  </span>
+                  . En cuanto se publique en el backend, este panel mostrará el historial completo desde SQL Server.
+                </p>
+              </div>
+            )}
           </section>
         </div>
 
-        {/* Footer with prepared Stage 2 actions disabled + tooltip */}
         <SheetFooter className="border-t bg-muted/25 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
           <span className="text-[11px] text-muted-foreground">
-            Edición de padrón reservada para Etapa 2
+            {canManage ? 'Gestión habilitada sobre Silver.Dim_Personal' : 'Solo lectura para rol actual'}
           </span>
-          <div className="flex flex-wrap items-center gap-2">
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <span
-                    className="inline-flex cursor-not-allowed"
-                    tabIndex={0}
-                  />
-                }
+          {canManage && operario && (
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+                <Pencil className="size-3.5" />
+                Editar operario
+              </Button>
+              <Button
+                variant={isOperarioActivo ? 'destructive' : 'secondary'}
+                size="sm"
+                disabled={!operario.dni}
+                onClick={() => setToggleOpen(true)}
               >
-                <Button variant="outline" size="sm" disabled>
-                  <Pencil className="size-3.5" />
-                  Editar operario
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Disponible en Etapa 2 Backend</TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <span
-                    className="inline-flex cursor-not-allowed"
-                    tabIndex={0}
-                  />
-                }
-              >
-                <Button variant="destructive" size="sm" disabled>
-                  <UserX className="size-3.5" />
-                  Desactivar operario
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Disponible en Etapa 2 Backend</TooltipContent>
-            </Tooltip>
-          </div>
+                {isOperarioActivo ? (
+                  <>
+                    <UserX className="size-3.5" />
+                    Desactivar operario
+                  </>
+                ) : (
+                  <>
+                    <UserCheck className="size-3.5" />
+                    Reactivar operario
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
         </SheetFooter>
+
+        <OperarioFormDialog
+          open={editOpen}
+          operario={operario}
+          onOpenChange={setEditOpen}
+        />
+
+        <ConfirmOperarioToggleDialog
+          operario={operario}
+          open={toggleOpen}
+          onOpenChange={setToggleOpen}
+        />
       </SheetContent>
     </Sheet>
   )

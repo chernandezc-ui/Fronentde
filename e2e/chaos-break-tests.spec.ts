@@ -36,12 +36,15 @@ const ALL_APP_ROUTES = [
   '/cuarentena',
   '/maestros?tab=variedades',
   '/maestros?tab=geografia',
+  '/maestros?tab=campanas',
   '/operarios',
   '/configuracion?tab=parametros',
   '/configuracion?tab=biologia',
+  '/configuracion?tab=reglas',
   '/configuracion?tab=usuarios',
   '/auditoria?tab=bitacora',
   '/auditoria?tab=ingesta',
+  '/auditoria?tab=accesos',
 ]
 
 test.describe('Chaos & Break Tests — Stress, Fault Injection & Security', () => {

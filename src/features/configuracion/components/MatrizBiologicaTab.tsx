@@ -30,14 +30,12 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
+import { API_ENDPOINTS, isEndpointNotImplementedError } from '@/shared/api/endpoints'
 import { ApiErrorBanner } from '@/shared/components/ApiErrorBanner'
 import { StatusBadge } from '@/shared/components/StatusBadge'
 import {
-  DECAY_FACTOR,
-  DELTA_PRODUCTIVAS,
   ESTADOS_BIOLOGICOS_ORDEN,
   ESTADO_BIOLOGICO_META,
-  PLANTAS_POR_PUNTO,
   SEMANAS_SIXWEEK,
   SEMANAS_SIXWEEK_KEYS,
   areMatricesEqual,
@@ -52,13 +50,20 @@ import {
   serializeMatrizPayload,
   validarMatriz,
 } from '../matrizUtils'
+import {
+  DEFAULT_BIOLOGIA_CONSTANTES,
+  biologiaConstantesSchema,
+} from '../schemas'
 import type {
+  BiologiaConstantes,
   EstadoBiologico,
   MatrizBiologicaCompleta,
   SemanaSixWeekKey,
 } from '../types'
 import {
+  useBiologiaConstantesQuery,
   useMatrizBiologica,
+  useSaveBiologiaConstantesMutation,
   useSaveMatrizBiologicaMutation,
 } from '../useConfiguracionQueries'
 
@@ -81,6 +86,91 @@ export function MatrizBiologicaTab({
 
   const query = useMatrizBiologica(active)
   const saveMutation = useSaveMatrizBiologicaMutation()
+
+  const constantesQuery = useBiologiaConstantesQuery(active)
+  const saveConstantesMutation = useSaveBiologiaConstantesMutation()
+  const [draftConstantes, setDraftConstantes] =
+    useState<BiologiaConstantes | null>(null)
+  const [rawConstInputs, setRawConstInputs] = useState<Record<string, string>>(
+    {},
+  )
+
+  const baselineConstantes = useMemo(
+    () => constantesQuery.data ?? DEFAULT_BIOLOGIA_CONSTANTES,
+    [constantesQuery.data],
+  )
+  const currentConstantes = draftConstantes ?? baselineConstantes
+  const constantesEndpointPending =
+    constantesQuery.isError &&
+    isEndpointNotImplementedError(constantesQuery.error)
+  const isConstantesDirty = useMemo(
+    () =>
+      draftConstantes !== null &&
+      JSON.stringify(draftConstantes) !== JSON.stringify(baselineConstantes),
+    [draftConstantes, baselineConstantes],
+  )
+  const constantesValidation = useMemo(
+    () => biologiaConstantesSchema.safeParse(currentConstantes),
+    [currentConstantes],
+  )
+  const firstConstantesError = constantesValidation.success
+    ? null
+    : (constantesValidation.error.issues[0]?.message ??
+      'Revisa los valores numéricos ingresados.')
+
+  const updatePlantasPorPunto = (rawStr: string) => {
+    setRawConstInputs((prev) => ({ ...prev, plantas_por_punto: rawStr }))
+    const parsed = rawStr.trim() === '' ? Number.NaN : Number(rawStr.trim())
+    setDraftConstantes((prev) => {
+      const base = prev ?? baselineConstantes
+      return {
+        ...base,
+        plantas_por_punto: parsed,
+      }
+    })
+  }
+
+  const updateWeekConstant = (
+    group: 'decay_factor' | 'delta_productivas',
+    weekKey: SemanaSixWeekKey,
+    rawStr: string,
+  ) => {
+    const fieldId = `${group}:${weekKey}`
+    setRawConstInputs((prev) => ({ ...prev, [fieldId]: rawStr }))
+    const normalized = rawStr.trim().replace(',', '.')
+    const parsed = normalized === '' ? Number.NaN : Number(normalized)
+    setDraftConstantes((prev) => {
+      const base = prev ?? baselineConstantes
+      return {
+        ...base,
+        [group]: {
+          ...base[group],
+          [weekKey]: parsed,
+        },
+      }
+    })
+  }
+
+  const handleSaveConstantes = async () => {
+    if (!constantesValidation.success) return
+    try {
+      await saveConstantesMutation.mutateAsync(constantesValidation.data)
+      setDraftConstantes(null)
+      setRawConstInputs({})
+    } catch {
+      // Manejado por notifyStage2MutationError
+    }
+  }
+
+  const handleDiscardConstantes = () => {
+    setDraftConstantes(null)
+    setRawConstInputs({})
+  }
+
+  const handleResetDefaultConstantes = () => {
+    setDraftConstantes(DEFAULT_BIOLOGIA_CONSTANTES)
+    setRawConstInputs({})
+  }
 
   const isBackendEmpty =
     query.isSuccess && isMatrizBackendVacia(query.data)
@@ -775,33 +865,71 @@ export function MatrizBiologicaTab({
           </CardContent>
         </Card>
 
-        {/* Read-only Reference Card for Fixed Engine Constants */}
+        {/* Editable Engine Constants Card (Stage 2 GET/PUT with local defaults fallback) */}
         <Card className="xl:col-span-5">
           <CardHeader className="border-b pb-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-1.5">
-                <Lock className="size-3.5 text-indigo-600 dark:text-indigo-400" />
+                {!canEdit && (
+                  <Lock className="size-3.5 text-indigo-600 dark:text-indigo-400" />
+                )}
                 <CardTitle className="text-sm font-semibold">
-                  Parámetros biológicos fijos del motor
+                  Parámetros biológicos del motor
                 </CardTitle>
               </div>
-              <StatusBadge label="Solo lectura · Etapa 2" tone="readonly" />
+              {constantesQuery.isSuccess ? (
+                <StatusBadge label="Conectado a API" tone="ok" />
+              ) : constantesEndpointPending ? (
+                <StatusBadge label="Defaults locales · API pendiente" tone="readonly" />
+              ) : constantesQuery.isError ? (
+                <StatusBadge label="Usando defaults locales" tone="warning" />
+              ) : !canEdit ? (
+                <StatusBadge label="Solo lectura" tone="readonly" />
+              ) : (
+                <StatusBadge label="Motor Six-Week" tone="ok" />
+              )}
             </div>
             <CardDescription className="text-xs">
-              Constantes definidas en{' '}
+              Valores por defecto de{' '}
               <span className="font-mono text-foreground">
                 dominio/proyecciones.py
               </span>
-              . Su edición persistida en BD y el CRUD de{' '}
+              . Sincronizado con{' '}
               <span className="font-mono text-foreground">
-                Silver.Dim_Campana
-              </span>{' '}
-              pertenecen a <strong>Etapa 2</strong>.
+                GET/PUT {API_ENDPOINTS.configuracion.biologiaConstantes}
+              </span>
+              .
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 pt-4">
+            {constantesEndpointPending && (
+              <Alert className="border-amber-500/30 bg-amber-500/[0.06] py-2">
+                <Info className="size-3.5 text-amber-600 dark:text-amber-400" />
+                <AlertDescription className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted-foreground">
+                  <span>
+                    El backend devolvió {constantesQuery.error instanceof Error ? 'HTTP 404/501' : 'ruta pendiente'}. Mostrando constantes base locales; puedes ajustar valores o guardar cuando publiques la ruta.
+                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="xs"
+                    onClick={() => void constantesQuery.refetch()}
+                    disabled={constantesQuery.isFetching}
+                  >
+                    <RefreshCw
+                      className={cn(
+                        'size-3',
+                        constantesQuery.isFetching && 'animate-spin',
+                      )}
+                    />
+                    Comprobar API
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            )}
+
             {/* PLANTAS_POR_PUNTO */}
-            <div className="flex items-center justify-between rounded-lg border bg-muted/25 px-3 py-2">
+            <div className="flex items-center justify-between gap-3 rounded-lg border bg-muted/25 px-3 py-2">
               <div>
                 <p className="font-mono text-xs font-semibold text-foreground">
                   PLANTAS_POR_PUNTO
@@ -810,9 +938,39 @@ export function MatrizBiologicaTab({
                   Plantas evaluadas por punto de muestreo fenológico
                 </p>
               </div>
-              <span className="metric-value font-mono text-lg font-semibold text-foreground">
-                {PLANTAS_POR_PUNTO}
-              </span>
+              {canEdit ? (
+                <Input
+                  type="number"
+                  step={1}
+                  min={1}
+                  max={1000}
+                  aria-label="PLANTAS_POR_PUNTO"
+                  value={
+                    Object.prototype.hasOwnProperty.call(
+                      rawConstInputs,
+                      'plantas_por_punto',
+                    )
+                      ? rawConstInputs.plantas_por_punto
+                      : String(currentConstantes.plantas_por_punto)
+                  }
+                  onChange={(e) => updatePlantasPorPunto(e.target.value)}
+                  onBlur={() => {
+                    if (Number.isInteger(currentConstantes.plantas_por_punto)) {
+                      setRawConstInputs((prev) => {
+                        const next = { ...prev }
+                        delete next.plantas_por_punto
+                        return next
+                      })
+                    }
+                  }}
+                  disabled={saveConstantesMutation.isPending}
+                  className="h-8 w-24 text-right font-mono text-sm font-semibold tabular-nums"
+                />
+              ) : (
+                <span className="metric-value font-mono text-lg font-semibold text-foreground">
+                  {currentConstantes.plantas_por_punto}
+                </span>
+              )}
             </div>
 
             {/* DECAY_FACTOR */}
@@ -825,20 +983,59 @@ export function MatrizBiologicaTab({
                   Factor de decaimiento semanal
                 </span>
               </div>
-              <div className="grid grid-cols-6 gap-1.5">
-                {SEMANAS_SIXWEEK.map((w) => (
-                  <div
-                    key={w}
-                    className="rounded-md border bg-muted/20 px-1.5 py-1.5 text-center"
-                  >
-                    <p className="font-mono text-[10px] text-muted-foreground">
-                      W{w}
-                    </p>
-                    <p className="metric-value font-mono text-xs font-semibold text-foreground">
-                      {DECAY_FACTOR[w].toFixed(2)}
-                    </p>
-                  </div>
-                ))}
+              <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
+                {SEMANAS_SIXWEEK.map((w) => {
+                  const wk = String(w) as SemanaSixWeekKey
+                  const fieldId = `decay_factor:${wk}`
+                  const val = currentConstantes.decay_factor[wk]
+                  return (
+                    <div
+                      key={w}
+                      className="rounded-md border bg-muted/20 px-1.5 py-1.5 text-center"
+                    >
+                      <p className="font-mono text-[10px] text-muted-foreground">
+                        W{w}
+                      </p>
+                      {canEdit ? (
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min={0}
+                          max={2}
+                          aria-label={`DECAY_FACTOR semana ${w}`}
+                          value={
+                            Object.prototype.hasOwnProperty.call(
+                              rawConstInputs,
+                              fieldId,
+                            )
+                              ? rawConstInputs[fieldId]
+                              : Number.isFinite(val)
+                                ? String(val)
+                                : ''
+                          }
+                          onChange={(e) =>
+                            updateWeekConstant('decay_factor', wk, e.target.value)
+                          }
+                          onBlur={() => {
+                            if (Number.isFinite(val)) {
+                              setRawConstInputs((prev) => {
+                                const next = { ...prev }
+                                delete next[fieldId]
+                                return next
+                              })
+                            }
+                          }}
+                          disabled={saveConstantesMutation.isPending}
+                          className="mt-0.5 h-7 px-1 text-center font-mono text-xs font-semibold tabular-nums"
+                        />
+                      ) : (
+                        <p className="metric-value font-mono text-xs font-semibold text-foreground">
+                          {val.toFixed(2)}
+                        </p>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             </div>
 
@@ -852,10 +1049,12 @@ export function MatrizBiologicaTab({
                   Ajuste semanal de % plantas productivas
                 </span>
               </div>
-              <div className="grid grid-cols-6 gap-1.5">
+              <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
                 {SEMANAS_SIXWEEK.map((w) => {
-                  const delta = DELTA_PRODUCTIVAS[w]
-                  const sign = delta > 0 ? '+' : ''
+                  const wk = String(w) as SemanaSixWeekKey
+                  const fieldId = `delta_productivas:${wk}`
+                  const delta = currentConstantes.delta_productivas[wk]
+                  const sign = Number.isFinite(delta) && delta > 0 ? '+' : ''
                   return (
                     <div
                       key={w}
@@ -864,24 +1063,110 @@ export function MatrizBiologicaTab({
                       <p className="font-mono text-[10px] text-muted-foreground">
                         W{w}
                       </p>
-                      <p
-                        className={cn(
-                          'metric-value font-mono text-xs font-semibold',
-                          delta > 0
-                            ? 'text-emerald-700 dark:text-emerald-400'
-                            : delta < 0
-                              ? 'text-amber-700 dark:text-amber-400'
-                              : 'text-muted-foreground',
-                        )}
-                      >
-                        {sign}
-                        {delta.toFixed(2)}
-                      </p>
+                      {canEdit ? (
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min={-1}
+                          max={1}
+                          aria-label={`DELTA_PRODUCTIVAS semana ${w}`}
+                          value={
+                            Object.prototype.hasOwnProperty.call(
+                              rawConstInputs,
+                              fieldId,
+                            )
+                              ? rawConstInputs[fieldId]
+                              : Number.isFinite(delta)
+                                ? String(delta)
+                                : ''
+                          }
+                          onChange={(e) =>
+                            updateWeekConstant(
+                              'delta_productivas',
+                              wk,
+                              e.target.value,
+                            )
+                          }
+                          onBlur={() => {
+                            if (Number.isFinite(delta)) {
+                              setRawConstInputs((prev) => {
+                                const next = { ...prev }
+                                delete next[fieldId]
+                                return next
+                              })
+                            }
+                          }}
+                          disabled={saveConstantesMutation.isPending}
+                          className="mt-0.5 h-7 px-1 text-center font-mono text-xs font-semibold tabular-nums"
+                        />
+                      ) : (
+                        <p
+                          className={cn(
+                            'metric-value font-mono text-xs font-semibold',
+                            delta > 0
+                              ? 'text-emerald-700 dark:text-emerald-400'
+                              : delta < 0
+                                ? 'text-amber-700 dark:text-amber-400'
+                                : 'text-muted-foreground',
+                          )}
+                        >
+                          {sign}
+                          {delta.toFixed(2)}
+                        </p>
+                      )}
                     </div>
                   )
                 })}
               </div>
             </div>
+
+            {firstConstantesError && (
+              <p className="text-[11px] font-medium text-destructive">
+                {firstConstantesError}
+              </p>
+            )}
+
+            {canEdit && (
+              <div className="flex flex-wrap items-center justify-end gap-2 border-t pt-3">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  onClick={handleResetDefaultConstantes}
+                  disabled={saveConstantesMutation.isPending}
+                >
+                  <RotateCcw className="size-3" />
+                  Restaurar base
+                </Button>
+                {isConstantesDirty && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="xs"
+                    onClick={handleDiscardConstantes}
+                    disabled={saveConstantesMutation.isPending}
+                  >
+                    Descartar
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  size="xs"
+                  onClick={() => void handleSaveConstantes()}
+                  disabled={
+                    !constantesValidation.success ||
+                    saveConstantesMutation.isPending
+                  }
+                >
+                  {saveConstantesMutation.isPending ? (
+                    <Loader2 className="size-3 animate-spin" />
+                  ) : (
+                    <Save className="size-3" />
+                  )}
+                  Guardar constantes
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

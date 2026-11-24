@@ -37,12 +37,23 @@ export interface UpdateParametrosBatchResponse {
 // ── 2. Reglas de Validación ───────────────────────────────────────────────────
 
 export interface ReglaValidacion {
+  id_regla?: number | string | null
   tabla_destino: string | null
   columna: string | null
   tipo_validacion: string | null
   valor_min: number | null
   valor_max: number | null
   accion: string | null
+  activo: boolean
+}
+
+export interface UpsertReglaPayload {
+  tabla_destino: string
+  columna: string
+  tipo_validacion: string
+  valor_min: number | null
+  valor_max: number | null
+  accion: string
   activo: boolean
 }
 
@@ -100,6 +111,13 @@ export interface SaveMatrizResponse {
   ok: boolean
 }
 
+export interface BiologiaConstantes {
+  plantas_por_punto: number
+  decay_factor: Record<SemanaSixWeekKey, number>
+  delta_productivas: Record<SemanaSixWeekKey, number>
+  fecha_modificacion?: string | null
+}
+
 // ── 4. Administración de Usuarios (solo admin) ────────────────────────────────
 
 export interface UsuarioAdmin {
@@ -119,6 +137,22 @@ export interface CreateUsuarioPayload {
   email: string | null
   clave: string
   rol: RolUsuario
+}
+
+export interface UpdateUsuarioPayload {
+  nombre_display: string
+  email: string | null
+  rol: RolUsuario
+}
+
+export interface ResetClavePayload {
+  nueva_clave: string
+}
+
+export interface ResetClaveResponse {
+  mensaje: string
+  clave_temporal?: string
+  ok?: boolean
 }
 
 export interface UsuarioMensajeResponse {

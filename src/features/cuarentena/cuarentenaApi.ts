@@ -1,15 +1,19 @@
 import { apiRequest } from '@/shared/api/client'
+import { API_ENDPOINTS } from '@/shared/api/endpoints'
 import { asFiniteNumber, asRecord, normalizePaginated } from '@/shared/api/normalize'
 import { buildRechazarPath, buildResolverPath } from './cuarentenaUtils'
 import type {
   CuarentenaResumen,
   EstadoCuarentenaFiltro,
   PeticionRechazarCuarentena,
+  PeticionRechazarLote,
   PeticionResolverCuarentena,
+  PeticionResolverLote,
   RegistroCuarentena,
   RespuestaAccionCuarentena,
   RespuestaCandidatosReinyeccion,
   RespuestaCuarentenaPaginada,
+  RespuestaLoteCuarentena,
   RespuestaReinyeccion,
 } from './types'
 
@@ -18,6 +22,8 @@ export interface ListarCuarentenaParams {
   tamano: number
   estado_filtro: EstadoCuarentenaFiltro
   tabla_filtro?: string
+  q?: string
+  columna?: string
 }
 
 export async function fetchCuarentenaResumen(): Promise<CuarentenaResumen> {
@@ -34,12 +40,16 @@ export async function fetchCuarentenaList(
   params: ListarCuarentenaParams,
 ): Promise<RespuestaCuarentenaPaginada> {
   const tabla = params.tabla_filtro?.trim()
-  const raw = await apiRequest<unknown>('/api/v1/cuarentena', {
+  const q = params.q?.trim()
+  const columna = params.columna?.trim()
+  const raw = await apiRequest<unknown>(API_ENDPOINTS.cuarentena.listar, {
     query: {
       pagina: params.pagina,
       tamano: params.tamano,
       estado_filtro: params.estado_filtro,
       tabla_filtro: tabla ? tabla : undefined,
+      q: q ? q : undefined,
+      columna: columna ? columna : undefined,
     },
   })
   return normalizePaginated<RegistroCuarentena>(raw, params.pagina, params.tamano)
@@ -90,5 +100,23 @@ export function ejecutarReinyeccionMdm(tabla?: string): Promise<RespuestaReinyec
     query: {
       tabla: cleanTabla ? cleanTabla : undefined,
     },
+  })
+}
+
+export function resolverCuarentenaLote(
+  payload: PeticionResolverLote,
+): Promise<RespuestaLoteCuarentena> {
+  return apiRequest<RespuestaLoteCuarentena>(API_ENDPOINTS.cuarentena.resolverLote, {
+    method: 'POST',
+    body: payload,
+  })
+}
+
+export function rechazarCuarentenaLote(
+  payload: PeticionRechazarLote,
+): Promise<RespuestaLoteCuarentena> {
+  return apiRequest<RespuestaLoteCuarentena>(API_ENDPOINTS.cuarentena.rechazarLote, {
+    method: 'POST',
+    body: payload,
   })
 }

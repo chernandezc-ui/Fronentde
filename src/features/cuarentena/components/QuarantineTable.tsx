@@ -26,6 +26,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -51,6 +52,7 @@ import { formatDateTime, formatNumber } from '@/shared/lib/format'
 import {
   BRONZE_TABLE_SUGGESTIONS,
   ESTADO_FILTRO_OPTIONS,
+  getCuarentenaRecordKey,
   isRecordPending,
   mapCuarentenaEstadoTone,
   PAGE_SIZE_OPTIONS,
@@ -70,6 +72,8 @@ interface QuarantineTableProps {
   tamano: number
   estado: EstadoCuarentenaFiltro
   tabla: string
+  q?: string
+  columna?: string
   resumen: CuarentenaResumen | undefined
   isLoading: boolean
   isFetching: boolean
@@ -77,8 +81,13 @@ interface QuarantineTableProps {
   isError: boolean
   error: unknown
   canManageMdm: boolean
+  selectedKeys?: ReadonlySet<string>
+  onToggleSelect?: (record: RegistroCuarentena, checked: boolean) => void
+  onToggleSelectAllPending?: (checked: boolean) => void
   onEstadoChange: (estado: EstadoCuarentenaFiltro) => void
   onTablaChange: (tabla: string) => void
+  onQueryChange?: (q: string) => void
+  onColumnaChange?: (columna: string) => void
   onPaginaChange: (pagina: number) => void
   onTamanoChange: (tamano: number) => void
   onResetFilters: () => void
@@ -110,6 +119,8 @@ export function QuarantineTable({
   tamano,
   estado,
   tabla,
+  q = '',
+  columna = '',
   resumen,
   isLoading,
   isFetching,
@@ -117,8 +128,13 @@ export function QuarantineTable({
   isError,
   error,
   canManageMdm,
+  selectedKeys,
+  onToggleSelect,
+  onToggleSelectAllPending,
   onEstadoChange,
   onTablaChange,
+  onQueryChange,
+  onColumnaChange,
   onPaginaChange,
   onTamanoChange,
   onResetFilters,
@@ -126,7 +142,11 @@ export function QuarantineTable({
   onSelectRecord,
 }: QuarantineTableProps) {
   const [draftTabla, setDraftTabla] = useState<string | null>(null)
+  const [draftQ, setDraftQ] = useState<string | null>(null)
+  const [draftColumna, setDraftColumna] = useState<string | null>(null)
   const tablaInput = draftTabla ?? tabla
+  const qInput = draftQ ?? q
+  const columnaInput = draftColumna ?? columna
 
   // Debounce de filtro por tabla_origen hacia URL + servidor
   useEffect(() => {
@@ -141,9 +161,72 @@ export function QuarantineTable({
     return () => window.clearTimeout(timer)
   }, [draftTabla, tabla, onTablaChange])
 
+  useEffect(() => {
+    if (draftQ === null || !onQueryChange) return
+    const trimmed = draftQ.trim()
+    const timer = window.setTimeout(() => {
+      if (trimmed !== q) {
+        onQueryChange(trimmed)
+      }
+      setDraftQ(null)
+    }, 350)
+    return () => window.clearTimeout(timer)
+  }, [draftQ, q, onQueryChange])
+
+  useEffect(() => {
+    if (draftColumna === null || !onColumnaChange) return
+    const trimmed = draftColumna.trim()
+    const timer = window.setTimeout(() => {
+      if (trimmed !== columna) {
+        onColumnaChange(trimmed)
+      }
+      setDraftColumna(null)
+    }, 350)
+    return () => window.clearTimeout(timer)
+  }, [draftColumna, columna, onColumnaChange])
+
+  const pendingRowsInPage = useMemo(
+    () => rows.filter((r) => isRecordPending(r.estado)),
+    [rows],
+  )
+  const allPendingSelected =
+    pendingRowsInPage.length > 0 &&
+    Boolean(selectedKeys) &&
+    pendingRowsInPage.every((r) => selectedKeys?.has(getCuarentenaRecordKey(r)))
+
   const columns = useMemo(
     () =>
       columnHelper.columns([
+        ...(canManageMdm && onToggleSelect
+          ? [
+              columnHelper.display({
+                id: 'seleccion',
+                header: () => (
+                  <Checkbox
+                    aria-label="Seleccionar todos los pendientes en página"
+                    checked={allPendingSelected}
+                    disabled={pendingRowsInPage.length === 0}
+                    onCheckedChange={(checked) =>
+                      onToggleSelectAllPending?.(Boolean(checked))
+                    }
+                  />
+                ),
+                cell: (info) => {
+                  const row = info.row.original
+                  const pending = isRecordPending(row.estado)
+                  const isChecked = Boolean(selectedKeys?.has(getCuarentenaRecordKey(row)))
+                  return (
+                    <Checkbox
+                      aria-label={`Seleccionar registro ${row.id_registro}`}
+                      checked={isChecked}
+                      disabled={!pending}
+                      onCheckedChange={(checked) => onToggleSelect(row, Boolean(checked))}
+                    />
+                  )
+                },
+              }),
+            ]
+          : []),
         columnHelper.accessor('tabla_origen', {
           header: 'Tabla origen',
           cell: (info) => {
@@ -330,7 +413,7 @@ export function QuarantineTable({
           },
         }),
       ]),
-    [canManageMdm, onSelectRecord],
+    [canManageMdm, onSelectRecord, selectedKeys, onToggleSelect, onToggleSelectAllPending, allPendingSelected, pendingRowsInPage.length],
   )
 
   const paginationState = useMemo<PaginationState>(
@@ -374,7 +457,14 @@ export function QuarantineTable({
   const pageCount = Math.max(1, table.getPageCount())
   const startItem = total === 0 ? 0 : (pagina - 1) * tamano + 1
   const endItem = Math.min(total, pagina * tamano)
-  const hasActiveFilters = estado !== 'PENDIENTE' || tabla.length > 0 || tablaInput.trim().length > 0
+  const hasActiveFilters =
+    estado !== 'PENDIENTE' ||
+    tabla.length > 0 ||
+    tablaInput.trim().length > 0 ||
+    q.length > 0 ||
+    qInput.trim().length > 0 ||
+    columna.length > 0 ||
+    columnaInput.trim().length > 0
 
   return (
     <Card>
@@ -487,13 +577,66 @@ export function QuarantineTable({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <div className="relative min-w-[240px] flex-1 sm:w-72 sm:flex-initial">
+            {onQueryChange && (
+              <div className="relative min-w-[200px] flex-1 sm:w-56 sm:flex-initial">
+                <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={qInput}
+                  onChange={(e) => setDraftQ(e.target.value)}
+                  maxLength={80}
+                  placeholder="Buscar texto o DNI (q)..."
+                  aria-label="Buscar texto en cuarentena (server-side)"
+                  className="pr-7 pl-8 text-xs"
+                />
+                {qInput.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDraftQ(null)
+                      onQueryChange('')
+                    }}
+                    aria-label="Limpiar búsqueda de texto"
+                    className="absolute top-1/2 right-2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                )}
+              </div>
+            )}
+
+            {onColumnaChange && (
+              <div className="relative min-w-[160px] sm:w-44">
+                <Input
+                  value={columnaInput}
+                  onChange={(e) => setDraftColumna(e.target.value)}
+                  maxLength={80}
+                  placeholder="Columna origen..."
+                  aria-label="Filtrar por columna origen"
+                  className="pr-7 font-mono text-xs"
+                />
+                {columnaInput.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDraftColumna(null)
+                      onColumnaChange('')
+                    }}
+                    aria-label="Limpiar filtro de columna"
+                    className="absolute top-1/2 right-2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                )}
+              </div>
+            )}
+
+            <div className="relative min-w-[210px] flex-1 sm:w-64 sm:flex-initial">
               <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={tablaInput}
                 onChange={(e) => setDraftTabla(e.target.value)}
                 list="cuarentena-bronce-tables"
-                placeholder="Filtrar por tabla origen (ej. Peladas)..."
+                placeholder="Tabla origen (ej. Peladas)..."
                 aria-label="Filtrar por tabla origen"
                 className="pr-8 pl-8 font-mono text-xs"
               />
@@ -524,6 +667,8 @@ export function QuarantineTable({
                 size="sm"
                 onClick={() => {
                   setDraftTabla(null)
+                  setDraftQ(null)
+                  setDraftColumna(null)
                   onResetFilters()
                 }}
                 className="text-xs text-muted-foreground hover:text-foreground"

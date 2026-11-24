@@ -1,4 +1,4 @@
-export type AuditoriaTabId = 'bitacora' | 'ingesta'
+export type AuditoriaTabId = 'bitacora' | 'ingesta' | 'accesos'
 
 export type EstadoBitacora = 'OK' | 'ERROR' | 'EN_PROCESO' | 'SKIPPED' | 'TIMEOUT'
 
@@ -100,4 +100,59 @@ export interface CsvDownloadResult {
   filename: string
   sizeBytes: number
   tabla: string
+}
+
+export type EstadoCarpetaExcel = 'entrada' | 'procesados' | 'rechazados'
+
+export interface ArchivoExcelIngesta {
+  carpeta: string
+  nombre: string
+  tamano_bytes: number
+  fecha_modificacion: string | null
+  estado: EstadoCarpetaExcel | string
+  tiene_marca_procesado?: boolean
+}
+
+export interface RespuestaListaExcelIngesta {
+  carpetas: string[]
+  archivos: ArchivoExcelIngesta[]
+}
+
+export interface RespuestaSubirExcel {
+  ok: boolean
+  carpeta: string
+  nombre: string
+  tamano_bytes?: number
+  mensaje: string
+}
+
+export interface AccesoAuditoriaItem {
+  id_acceso: number | string
+  fecha: string | null
+  nombre_usuario: string
+  rol: string | null
+  accion: string
+  modulo: string | null
+  metodo: string | null
+  ruta: string | null
+  estado_http: number | null
+  ip: string | null
+  request_id: string | null
+  detalle: string | null
+}
+
+export interface AccesosQueryParams {
+  pagina?: number
+  tamano?: number
+  usuario?: string
+  accion?: string
+  desde?: string
+  hasta?: string
+}
+
+export interface RespuestaAccesosPagina {
+  items: AccesoAuditoriaItem[]
+  total: number
+  pagina: number
+  tamano: number
 }

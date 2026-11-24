@@ -60,4 +60,28 @@ export interface CuarentenaFiltrosUrl {
   tamano: number
   estado: EstadoCuarentenaFiltro
   tabla: string
+  q?: string
+  columna?: string
+}
+
+export interface BatchCuarentenaRef {
+  tabla_origen: string
+  id_registro: string
+}
+
+export interface PeticionResolverLote {
+  registros: BatchCuarentenaRef[]
+  valor_canonico: string
+  comentario: string | null
+}
+
+export interface PeticionRechazarLote {
+  registros: BatchCuarentenaRef[]
+  motivo: string
+}
+
+export interface RespuestaLoteCuarentena {
+  procesados: number
+  omitidos?: number
+  mensaje: string
 }

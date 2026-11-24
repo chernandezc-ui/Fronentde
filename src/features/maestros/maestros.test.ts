@@ -6,11 +6,16 @@ import {
   VARIEDAD_BREEDER_MAX,
   VARIEDAD_NOMBRE_MAX,
   buildGeografiaQueryParams,
+  campanaFormSchema,
   createVarietyFormSchema,
+  geografiaFormSchema,
+  mdmVariedadFormSchema,
   normalizeGeografiaPage,
   normalizeGeografiaPageSize,
   parseMaestrosTab,
   toCreateVarietyPayload,
+  toUpsertCampanaPayload,
+  toUpsertGeografiaPayload,
 } from './schemas'
 
 describe('maestros schemas & query normalization', () => {
@@ -110,6 +115,70 @@ describe('maestros schemas & query normalization', () => {
         sector: 'Sector Norte',
       })
       expect('fundo' in params).toBe(false)
+    })
+  })
+
+  describe('Stage 2 schemas (campanas, geografia, mdm variedades)', () => {
+    it('supports campanas tab and validates fecha_fin >= fecha_inicio', () => {
+      expect(parseMaestrosTab('campanas')).toBe('campanas')
+
+      const invalid = campanaFormSchema.safeParse({
+        codigo: 'CAMP-2026',
+        nombre_campana: 'Campaña Arándano 2026',
+        fecha_inicio: '2026-10-15',
+        fecha_fin: '2026-10-01',
+        es_activa: true,
+        descripcion: 'Cosecha principal',
+      })
+      expect(invalid.success).toBe(false)
+
+      const valid = campanaFormSchema.parse({
+        codigo: ' CAMP-2026 ',
+        nombre_campana: '  Campaña Arándano 2026  ',
+        fecha_inicio: '2026-08-01',
+        fecha_fin: '2026-12-20',
+        es_activa: true,
+        descripcion: '  ',
+      })
+      expect(toUpsertCampanaPayload(valid)).toEqual({
+        codigo: 'CAMP-2026',
+        nombre_campana: 'Campaña Arándano 2026',
+        fecha_inicio: '2026-08-01',
+        fecha_fin: '2026-12-20',
+        es_activa: true,
+        descripcion: null,
+      })
+    })
+
+    it('validates geografiaFormSchema and mdmVariedadFormSchema cleanly', () => {
+      const geoParsed = geografiaFormSchema.parse({
+        fundo: ' ACP Norte ',
+        sector: ' Sector 01 ',
+        modulo: '4',
+        turno: '',
+        valvula: 'V-12',
+        cama: '',
+        codigo_sap_campo: 'SAP-04',
+        es_test_block: false,
+        es_vigente: true,
+      })
+      expect(toUpsertGeografiaPayload(geoParsed)).toMatchObject({
+        fundo: 'ACP Norte',
+        sector: 'Sector 01',
+        modulo: 4,
+        turno: null,
+        valvula: 'V-12',
+        cama: null,
+        codigo_sap_campo: 'SAP-04',
+      })
+
+      expect(
+        mdmVariedadFormSchema.safeParse({
+          nombre_canonico: 'A',
+          breeder: '',
+          es_activa: true,
+        }).success,
+      ).toBe(false)
     })
   })
 })

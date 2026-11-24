@@ -282,4 +282,24 @@ describe('cuarentenaApi — contratos HTTP y encoding en runtime', () => {
     expect(execUrl.searchParams.get('tabla')).toBe('Bronce.Peladas')
     expect(execInit.method).toBe('POST')
   })
+
+  it('soporta parámetros server-side q y columna sin alterar defaults cuando faltan', () => {
+    expect(parseCuarentenaSearchParams(new URLSearchParams())).toEqual(DEFAULT_CUARENTENA_FILTERS)
+
+    const withSearch = parseCuarentenaSearchParams(
+      new URLSearchParams('pagina=2&tamano=50&estado=PENDIENTE&tabla=Bronce.Tareo&q=BILOXI&columna=Variedad'),
+    )
+    expect(withSearch).toEqual({
+      pagina: 2,
+      tamano: 50,
+      estado: 'PENDIENTE',
+      tabla: 'Bronce.Tareo',
+      q: 'BILOXI',
+      columna: 'Variedad',
+    })
+
+    const serialized = serializeCuarentenaSearchParams(withSearch)
+    expect(serialized.get('q')).toBe('BILOXI')
+    expect(serialized.get('columna')).toBe('Variedad')
+  })
 })

@@ -12,15 +12,14 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
-  Tooltip,
-  TooltipContent,
   TooltipProvider,
-  TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
+import { rolCumpleNivel, useAuthStore } from '@/shared/auth/authStore'
 import { StatusBadge } from '@/shared/components/StatusBadge'
 import { formatNumber } from '@/shared/lib/format'
 import { OperarioDetailSheet } from './components/OperarioDetailSheet'
+import { OperarioFormDialog } from './components/OperarioFormDialog'
 import { OperariosTable } from './components/OperariosTable'
 import { classifyAsertividad, computeOperariosKpis } from './operariosUtils'
 import type { OperarioPersonal } from './types'
@@ -30,10 +29,14 @@ const EMPTY_OPERARIOS: OperarioPersonal[] = []
 
 export function OperariosPage() {
   const reduceMotion = useReducedMotion()
+  const usuario = useAuthStore((s) => s.usuario)
+  const canManagePersonal = rolCumpleNivel(usuario?.rol, 'analista_mdm')
+
   const [pagina, setPagina] = useState(1)
   const [tamano, setTamano] = useState<number>(50)
   const [selectedOperario, setSelectedOperario] =
     useState<OperarioPersonal | null>(null)
+  const [createDialogOpen, setCreateDialogOpen] = useState(false)
 
   const personalQuery = usePersonal(pagina, tamano)
   const rows = personalQuery.data?.datos ?? EMPTY_OPERARIOS
@@ -64,11 +67,15 @@ export function OperariosPage() {
               <h1 className="text-xl font-semibold tracking-tight">
                 Directorio de Operarios
               </h1>
-              <StatusBadge label="Solo lectura · Etapa 2" tone="readonly" />
+              {canManagePersonal ? (
+                <StatusBadge label="Gestión padrón habilitada" tone="ok" />
+              ) : (
+                <StatusBadge label="Solo lectura" tone="readonly" />
+              )}
             </div>
             <p className="text-xs text-muted-foreground">
               Padrón operativo en{' '}
-              <span className="font-mono">Silver.Dim_Personal</span>, monitoreo de asertividad, ausentismo y cruce inicial de incidencias contra{' '}
+              <span className="font-mono">Silver.Dim_Personal</span>, monitoreo de asertividad, ausentismo y trazabilidad de incidencias contra{' '}
               <span className="font-mono">MDM.Cuarentena</span>.
             </p>
           </div>
@@ -89,24 +96,12 @@ export function OperariosPage() {
               Actualizar
             </Button>
 
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <span
-                    className="inline-flex cursor-not-allowed"
-                    tabIndex={0}
-                  />
-                }
-              >
-                <Button size="sm" disabled>
-                  <Plus className="size-3.5" />
-                  Nuevo operario
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent className="max-w-xs">
-                El CRUD de Silver.Dim_Personal (alta, edición y desactivación) estará disponible en Etapa 2 del backend.
-              </TooltipContent>
-            </Tooltip>
+            {canManagePersonal && (
+              <Button size="sm" onClick={() => setCreateDialogOpen(true)}>
+                <Plus className="size-3.5" />
+                Nuevo operario
+              </Button>
+            )}
           </div>
         </div>
 
@@ -263,10 +258,19 @@ export function OperariosPage() {
         {/* Sheet lateral de ficha e incidencias */}
         <OperarioDetailSheet
           operario={selectedOperario}
+          canManage={canManagePersonal}
           onOpenChange={(open) => {
             if (!open) setSelectedOperario(null)
           }}
         />
+
+        {canManagePersonal && (
+          <OperarioFormDialog
+            open={createDialogOpen}
+            operario={null}
+            onOpenChange={setCreateDialogOpen}
+          />
+        )}
       </motion.div>
     </TooltipProvider>
   )

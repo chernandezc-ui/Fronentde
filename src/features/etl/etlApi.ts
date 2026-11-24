@@ -57,20 +57,36 @@ export async function fetchActiveRuns(limite = 50): Promise<CorridaActiva[]> {
   )
 }
 
+function normalizePasoCorrida(raw: unknown): PasoCorrida {
+  const obj = asRecord(raw)
+  return {
+    id_paso: asFiniteNumber(obj.id_paso, 0),
+    id_corrida: typeof obj.id_corrida === 'string' ? obj.id_corrida : '',
+    nombre_paso: typeof obj.nombre_paso === 'string' ? obj.nombre_paso : 'Paso sin nombre',
+    orden: asFiniteNumber(obj.orden, 0),
+    estado: typeof obj.estado === 'string' ? obj.estado : 'PENDIENTE',
+    fecha_inicio: typeof obj.fecha_inicio === 'string' ? obj.fecha_inicio : null,
+    fecha_fin: typeof obj.fecha_fin === 'string' ? obj.fecha_fin : null,
+    mensaje_error: typeof obj.mensaje_error === 'string' ? obj.mensaje_error : null,
+    filas_procesadas: asFiniteNumber(obj.filas_procesadas, 0),
+    filas_rechazadas: asFiniteNumber(obj.filas_rechazadas, 0),
+  }
+}
+
 export async function fetchRunDetail(idCorrida: string): Promise<DetalleCorrida> {
   const raw = await apiRequest<DetalleCorrida>(`/api/v1/etl/corridas/${encodeURIComponent(idCorrida)}`)
   const obj = asRecord(raw)
   return {
     ...(raw as DetalleCorrida),
-    pasos: asArray<PasoCorrida>(obj.pasos),
+    pasos: asArray<unknown>(obj.pasos).map(normalizePasoCorrida),
     facts: asArray<string>(obj.facts),
   }
 }
 
 export async function fetchRunSteps(idCorrida: string): Promise<PasoCorrida[]> {
-  return asArray<PasoCorrida>(
+  return asArray<unknown>(
     await apiRequest<unknown>(`/api/v1/etl/corridas/${encodeURIComponent(idCorrida)}/pasos`),
-  )
+  ).map(normalizePasoCorrida)
 }
 
 export function startEtlRun(payload: PeticionIniciarCorrida): Promise<CorridaIniciada> {

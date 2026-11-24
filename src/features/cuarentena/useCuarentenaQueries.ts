@@ -1,18 +1,23 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { API_ENDPOINTS, notifyStage2MutationError } from '@/shared/api/endpoints'
 import { notifyApiError } from '@/shared/lib/format'
 import {
   ejecutarReinyeccionMdm,
   fetchCuarentenaList,
   fetchCuarentenaResumen,
   fetchReinyeccionCandidatos,
+  rechazarCuarentenaLote,
   rechazarCuarentenaRecord,
+  resolverCuarentenaLote,
   resolverCuarentenaRecord,
 } from './cuarentenaApi'
 import type {
   CuarentenaFiltrosUrl,
   PeticionRechazarCuarentena,
+  PeticionRechazarLote,
   PeticionResolverCuarentena,
+  PeticionResolverLote,
 } from './types'
 
 export const cuarentenaQueryKeys = {
@@ -29,6 +34,8 @@ export const cuarentenaQueryKeys = {
         tamano: filters.tamano,
         estado: filters.estado,
         tabla: filters.tabla.trim(),
+        q: (filters.q ?? '').trim(),
+        columna: (filters.columna ?? '').trim(),
       },
     ] as const,
   reinyeccionAll: () => ['cuarentena', 'reinyeccion'] as const,
@@ -53,6 +60,8 @@ export function useCuarentenaList(filters: CuarentenaFiltrosUrl) {
         tamano: filters.tamano,
         estado_filtro: filters.estado,
         tabla_filtro: filters.tabla,
+        q: filters.q,
+        columna: filters.columna,
       }),
     placeholderData: keepPreviousData,
     staleTime: 10_000,
@@ -141,6 +150,48 @@ export function useEjecutarReinyeccionMutation() {
     },
     onError: (err) => {
       notifyApiError(err, 'No se pudo ejecutar la reinyección MDM')
+    },
+  })
+}
+
+export function useResolverLoteMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (payload: PeticionResolverLote) => resolverCuarentenaLote(payload),
+    onSuccess: (res) => {
+      toast.success('Lote homologado y resuelto', { description: res.mensaje })
+      void queryClient.invalidateQueries({ queryKey: cuarentenaQueryKeys.resumen() })
+      void queryClient.invalidateQueries({ queryKey: cuarentenaQueryKeys.listAll() })
+      void queryClient.invalidateQueries({ queryKey: cuarentenaQueryKeys.reinyeccionAll() })
+    },
+    onError: (err) => {
+      notifyStage2MutationError(
+        err,
+        'POST',
+        API_ENDPOINTS.cuarentena.resolverLote,
+        'No se pudo resolver el lote en cuarentena',
+      )
+    },
+  })
+}
+
+export function useRechazarLoteMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (payload: PeticionRechazarLote) => rechazarCuarentenaLote(payload),
+    onSuccess: (res) => {
+      toast.success('Lote descartado', { description: res.mensaje })
+      void queryClient.invalidateQueries({ queryKey: cuarentenaQueryKeys.resumen() })
+      void queryClient.invalidateQueries({ queryKey: cuarentenaQueryKeys.listAll() })
+      void queryClient.invalidateQueries({ queryKey: cuarentenaQueryKeys.reinyeccionAll() })
+    },
+    onError: (err) => {
+      notifyStage2MutationError(
+        err,
+        'POST',
+        API_ENDPOINTS.cuarentena.rechazarLote,
+        'No se pudo descartar el lote en cuarentena',
+      )
     },
   })
 }

@@ -1,10 +1,18 @@
 import { z } from 'zod'
 import type { RolUsuario } from '@/shared/auth/authStore'
 import type { OperationalTone } from '@/shared/components/StatusBadge'
+import {
+  DECAY_FACTOR,
+  DELTA_PRODUCTIVAS,
+  PLANTAS_POR_PUNTO,
+} from './matrizUtils'
 import type {
+  BiologiaConstantes,
   ConfiguracionTab,
   CreateUsuarioPayload,
   GrupoParametro,
+  ReglaValidacion,
+  UpdateUsuarioPayload,
 } from './types'
 
 export const PARAMETRO_VALOR_MIN = 1
@@ -261,3 +269,194 @@ export function toCreateUsuarioPayload(
     rol: values.rol,
   }
 }
+
+export const editUsuarioFormSchema = z.object({
+  nombre_display: createUsuarioSchema.shape.nombre_display,
+  email: createUsuarioSchema.shape.email,
+  rol: createUsuarioSchema.shape.rol,
+})
+
+export type EditUsuarioFormValues = z.infer<typeof editUsuarioFormSchema>
+
+export function toUpdateUsuarioPayload(
+  values: EditUsuarioFormValues,
+): UpdateUsuarioPayload {
+  const emailTrimmed = values.email.trim()
+  return {
+    nombre_display: values.nombre_display.trim(),
+    email: emailTrimmed.length > 0 ? emailTrimmed : null,
+    rol: values.rol,
+  }
+}
+
+export const resetClaveFormSchema = z
+  .object({
+    nueva_clave: z
+      .string()
+      .min(
+        USUARIO_CLAVE_MIN,
+        `La contraseña debe tener al menos ${USUARIO_CLAVE_MIN} caracteres.`,
+      )
+      .max(
+        USUARIO_CLAVE_MAX,
+        `La contraseña no puede exceder ${USUARIO_CLAVE_MAX} caracteres.`,
+      ),
+    confirmar_clave: z.string().min(1, 'Confirma la nueva contraseña.'),
+  })
+  .refine((data) => data.nueva_clave === data.confirmar_clave, {
+    message: 'Las contraseñas no coinciden.',
+    path: ['confirmar_clave'],
+  })
+
+export type ResetClaveFormValues = z.infer<typeof resetClaveFormSchema>
+
+// ── Reglas de Validación DQ (Etapa 2) ─────────────────────────────────────────
+
+export const REGLA_TIPOS_SUGERIDOS = [
+  'RANGO',
+  'NO_NULO',
+  'LONGITUD',
+  'REGEX',
+  'LISTA',
+] as const
+
+export const REGLA_ACCIONES_SUGERIDAS = [
+  'CUARENTENA',
+  'RECHAZAR',
+  'ADVERTIR',
+] as const
+
+export function getReglaClave(
+  regla: Pick<ReglaValidacion, 'id_regla' | 'tabla_destino' | 'columna'>,
+): string {
+  if (regla.id_regla != null && String(regla.id_regla).trim().length > 0) {
+    return String(regla.id_regla).trim()
+  }
+  const tabla = (regla.tabla_destino ?? '').trim()
+  const col = (regla.columna ?? '').trim()
+  return `${tabla}:${col}`
+}
+
+export const reglaFormSchema = z
+  .object({
+    tabla_destino: z
+      .string()
+      .transform((v) => v.trim())
+      .pipe(
+        z
+          .string()
+          .min(1, 'Ingresa la tabla destino.')
+          .max(150, 'La tabla destino no puede exceder 150 caracteres.'),
+      ),
+    columna: z
+      .string()
+      .transform((v) => v.trim())
+      .pipe(
+        z
+          .string()
+          .min(1, 'Ingresa la columna a validar.')
+          .max(150, 'La columna no puede exceder 150 caracteres.'),
+      ),
+    tipo_validacion: z
+      .string()
+      .transform((v) => v.trim().toUpperCase())
+      .pipe(
+        z
+          .string()
+          .min(1, 'Ingresa el tipo de validación.')
+          .max(100, 'El tipo no puede exceder 100 caracteres.'),
+      ),
+    valor_min: z
+      .number({ error: 'Ingresa un número válido para el límite mínimo.' })
+      .finite('El límite mínimo debe ser un número finito.')
+      .nullable(),
+    valor_max: z
+      .number({ error: 'Ingresa un número válido para el límite máximo.' })
+      .finite('El límite máximo debe ser un número finito.')
+      .nullable(),
+    accion: z
+      .string()
+      .transform((v) => v.trim().toUpperCase())
+      .pipe(
+        z
+          .string()
+          .min(1, 'Selecciona o ingresa una acción ante fallo.')
+          .max(80, 'La acción no puede exceder 80 caracteres.'),
+      ),
+    activo: z.boolean(),
+  })
+  .refine(
+    (data) =>
+      data.valor_min === null ||
+      data.valor_max === null ||
+      data.valor_max >= data.valor_min,
+    {
+      message: 'El valor máximo debe ser mayor o igual al valor mínimo.',
+      path: ['valor_max'],
+    },
+  )
+
+export type ReglaFormValues = z.infer<typeof reglaFormSchema>
+
+// ── Constantes del Motor Biológico Six-Week (Etapa 2) ─────────────────────────
+
+export const DEFAULT_BIOLOGIA_CONSTANTES: BiologiaConstantes = {
+  plantas_por_punto: PLANTAS_POR_PUNTO,
+  decay_factor: {
+    '1': DECAY_FACTOR[1],
+    '2': DECAY_FACTOR[2],
+    '3': DECAY_FACTOR[3],
+    '4': DECAY_FACTOR[4],
+    '5': DECAY_FACTOR[5],
+    '6': DECAY_FACTOR[6],
+  },
+  delta_productivas: {
+    '1': DELTA_PRODUCTIVAS[1],
+    '2': DELTA_PRODUCTIVAS[2],
+    '3': DELTA_PRODUCTIVAS[3],
+    '4': DELTA_PRODUCTIVAS[4],
+    '5': DELTA_PRODUCTIVAS[5],
+    '6': DELTA_PRODUCTIVAS[6],
+  },
+}
+
+const weekDecaySchema = z
+  .number({ error: 'Ingresa un factor numérico válido.' })
+  .finite('Debe ser un número finito.')
+  .min(0, 'El factor decay no puede ser negativo.')
+  .max(2, 'El factor decay no debe exceder 2.00.')
+
+const weekDeltaSchema = z
+  .number({ error: 'Ingresa un delta numérico válido.' })
+  .finite('Debe ser un número finito.')
+  .min(-1, 'El delta no puede ser menor a -1.00.')
+  .max(1, 'El delta no puede ser mayor a +1.00.')
+
+export const biologiaConstantesSchema = z.object({
+  plantas_por_punto: z
+    .number({ error: 'Ingresa las plantas por punto.' })
+    .finite('Debe ser un número finito.')
+    .int('Debe ser un número entero.')
+    .min(1, 'Debe haber al menos 1 planta por punto.')
+    .max(1000, 'Máximo 1000 plantas por punto.'),
+  decay_factor: z.object({
+    '1': weekDecaySchema,
+    '2': weekDecaySchema,
+    '3': weekDecaySchema,
+    '4': weekDecaySchema,
+    '5': weekDecaySchema,
+    '6': weekDecaySchema,
+  }),
+  delta_productivas: z.object({
+    '1': weekDeltaSchema,
+    '2': weekDeltaSchema,
+    '3': weekDeltaSchema,
+    '4': weekDeltaSchema,
+    '5': weekDeltaSchema,
+    '6': weekDeltaSchema,
+  }),
+})
+
+export type BiologiaConstantesFormValues = z.infer<
+  typeof biologiaConstantesSchema
+>

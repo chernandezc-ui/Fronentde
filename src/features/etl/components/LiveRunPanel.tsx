@@ -95,13 +95,15 @@ function isErrorEvent(ev: EtlStreamEvent): boolean {
 
 function isPasoEvent(ev: EtlStreamEvent): boolean {
   const t = ev.tipo.toLowerCase()
-  return t === 'paso' || t === 'step' || t === 'fin'
+  return t === 'paso' || t === 'step' || t === 'progreso' || t === 'fin'
 }
 
 function getEventPillStyle(ev: EtlStreamEvent): string {
   const t = ev.tipo.toLowerCase()
   if (isErrorEvent(ev)) return 'bg-rose-500/20 text-rose-300 border-rose-500/40'
-  if (t === 'paso' || t === 'step') return 'bg-sky-500/20 text-sky-300 border-sky-500/40'
+  if (t === 'paso' || t === 'step' || t === 'progreso') {
+    return 'bg-sky-500/20 text-sky-300 border-sky-500/40'
+  }
   if (t === 'fin') return 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
   if (t === 'warn' || t === 'warning') return 'bg-amber-500/20 text-amber-300 border-amber-500/40'
   return 'bg-zinc-800 text-zinc-300 border-zinc-700'
@@ -189,6 +191,14 @@ function LiveRunPanelContent({
   const completedPasos = orderedPasos.filter((p) =>
     ['OK', 'COMPLETADO', 'EXITOSO'].includes(p.estado.toUpperCase()),
   ).length
+  const totalFilasProcesadas = orderedPasos.reduce(
+    (acc, p) => acc + (typeof p.filas_procesadas === 'number' ? p.filas_procesadas : 0),
+    0,
+  )
+  const totalFilasRechazadas = orderedPasos.reduce(
+    (acc, p) => acc + (typeof p.filas_rechazadas === 'number' ? p.filas_rechazadas : 0),
+    0,
+  )
   const progressPct =
     orderedPasos.length > 0 ? Math.round((completedPasos / orderedPasos.length) * 100) : 0
   const runDurationSec = computeElapsedSeconds(detail?.fecha_inicio, detail?.fecha_fin)
@@ -411,11 +421,18 @@ function LiveRunPanelContent({
           {/* Steps trace */}
           <Card className="xl:col-span-5">
             <CardHeader className="border-b pb-3">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <CardTitle className="text-sm font-semibold">Traza de pasos</CardTitle>
-                <Badge variant="outline" className="font-mono text-[11px] tabular-nums">
-                  {completedPasos}/{orderedPasos.length} OK
-                </Badge>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {(totalFilasProcesadas > 0 || totalFilasRechazadas > 0) && (
+                    <Badge variant="secondary" className="font-mono text-[10px] tabular-nums">
+                      {formatNumber(totalFilasProcesadas)} proc · {formatNumber(totalFilasRechazadas)} rech
+                    </Badge>
+                  )}
+                  <Badge variant="outline" className="font-mono text-[11px] tabular-nums">
+                    {completedPasos}/{orderedPasos.length} OK
+                  </Badge>
+                </div>
               </div>
               {orderedPasos.length > 0 && (
                 <div className="pt-1.5">
@@ -440,6 +457,10 @@ function LiveRunPanelContent({
                 <div className="max-h-[470px] space-y-2 overflow-y-auto pr-1">
                   {orderedPasos.map((paso) => {
                     const dur = computeElapsedSeconds(paso.fecha_inicio, paso.fecha_fin)
+                    const isParallelFact =
+                      paso.nombre_paso.startsWith('Fact:') || paso.orden >= 100
+                    const procCount = paso.filas_procesadas ?? 0
+                    const rechCount = paso.filas_rechazadas ?? 0
                     return (
                       <div
                         key={paso.id_paso}
@@ -447,23 +468,50 @@ function LiveRunPanelContent({
                           'rounded-lg border p-2.5 text-xs transition-colors',
                           paso.mensaje_error
                             ? 'border-rose-500/35 bg-rose-500/5'
-                            : 'bg-background',
+                            : isParallelFact
+                              ? 'border-sky-500/20 bg-sky-500/[0.03]'
+                              : 'bg-background',
                         )}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex flex-wrap items-center gap-1.5">
                               <span className="font-mono text-[11px] text-muted-foreground tabular-nums">
                                 #{String(paso.orden).padStart(2, '0')}
                               </span>
                               <span className="truncate font-mono font-medium text-foreground">
                                 {paso.nombre_paso}
                               </span>
+                              {isParallelFact && (
+                                <Badge
+                                  variant="outline"
+                                  className="h-4 border-sky-500/35 px-1.5 font-mono text-[9px] text-sky-700 dark:text-sky-300"
+                                >
+                                  Fact paralelo
+                                </Badge>
+                              )}
                             </div>
-                            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 font-mono text-[11px] text-muted-foreground tabular-nums">
+                            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11px] text-muted-foreground tabular-nums">
                               <span>Inicio: {formatDateTime(paso.fecha_inicio)}</span>
                               <span>Duración: {formatDuration(dur)}</span>
                             </div>
+                            {(procCount > 0 || rechCount > 0 || isParallelFact) && (
+                              <div className="mt-1.5 flex flex-wrap items-center gap-1.5 font-mono text-[10px] tabular-nums">
+                                <span className="rounded border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-emerald-700 dark:text-emerald-300">
+                                  {formatNumber(procCount)} procesadas
+                                </span>
+                                <span
+                                  className={cn(
+                                    'rounded border px-1.5 py-0.5',
+                                    rechCount > 0
+                                      ? 'border-amber-500/35 bg-amber-500/10 text-amber-700 dark:text-amber-300'
+                                      : 'border-border bg-muted/40 text-muted-foreground',
+                                  )}
+                                >
+                                  {formatNumber(rechCount)} rechazadas
+                                </span>
+                              </div>
+                            )}
                           </div>
                           <StatusBadge label={paso.estado} className="shrink-0" />
                         </div>

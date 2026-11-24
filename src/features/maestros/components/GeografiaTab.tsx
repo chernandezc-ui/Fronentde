@@ -16,8 +16,9 @@ import {
   ChevronLeft,
   ChevronRight,
   FlaskConical,
-  Info,
-  Lock,
+  Pencil,
+  Plus,
+  Power,
   RefreshCw,
   Search,
   X,
@@ -42,11 +43,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { ApiErrorBanner } from '@/shared/components/ApiErrorBanner'
 import { StatusBadge } from '@/shared/components/StatusBadge'
@@ -55,11 +51,17 @@ import {
   GEOGRAFIA_FILTER_MAX_LEN,
   GEOGRAFIA_PAGE_SIZES,
   buildGeografiaQueryParams,
+  getGeografiaIdentifier,
   normalizeGeografiaPage,
   normalizeGeografiaPageSize,
 } from '../schemas'
 import type { GeografiaItem } from '../types'
-import { useDebouncedValue, useGeografia } from '../useMaestrosQueries'
+import {
+  useDebouncedValue,
+  useGeografia,
+  useToggleGeografiaVigenciaMutation,
+} from '../useMaestrosQueries'
+import { GeografiaFormDialog } from './GeografiaFormDialog'
 
 const EMPTY_ROWS: GeografiaItem[] = []
 
@@ -73,10 +75,14 @@ const columnHelper = createColumnHelper<typeof geografiaTableFeatures, Geografia
 
 interface GeografiaTabProps {
   active: boolean
+  canAdmin: boolean
 }
 
-export function GeografiaTab({ active }: GeografiaTabProps) {
+export function GeografiaTab({ active, canAdmin }: GeografiaTabProps) {
   const [searchParams, setSearchParams] = useSearchParams()
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [editingItem, setEditingItem] = useState<GeografiaItem | null>(null)
+  const toggleVigenciaMutation = useToggleGeografiaVigenciaMutation()
 
   const urlTexto = searchParams.get('texto') ?? ''
   const urlFundo = searchParams.get('fundo') ?? ''
@@ -308,8 +314,53 @@ export function GeografiaTab({ active }: GeografiaTabProps) {
               <StatusBadge label="HISTÓRICO" tone="cancelled" />
             ),
         }),
+        ...(canAdmin
+          ? [
+              columnHelper.display({
+                id: 'acciones',
+                header: 'Acciones',
+                cell: (info) => {
+                  const row = info.row.original
+                  return (
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="outline"
+                        size="xs"
+                        onClick={() => {
+                          setEditingItem(row)
+                          setDialogOpen(true)
+                        }}
+                      >
+                        <Pencil className="size-3" />
+                        Editar
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        disabled={toggleVigenciaMutation.isPending}
+                        onClick={() =>
+                          toggleVigenciaMutation.mutate({
+                            id: getGeografiaIdentifier(row),
+                            esVigente: !row.es_vigente,
+                          })
+                        }
+                        aria-label={row.es_vigente ? 'Desactivar vigencia' : 'Activar vigencia'}
+                      >
+                        <Power
+                          className={cn(
+                            'size-3',
+                            row.es_vigente ? 'text-amber-600' : 'text-emerald-600',
+                          )}
+                        />
+                      </Button>
+                    </div>
+                  )
+                },
+              }),
+            ]
+          : []),
       ]),
-    [],
+    [canAdmin, toggleVigenciaMutation],
   )
 
   const table = useTable(
@@ -330,36 +381,6 @@ export function GeografiaTab({ active }: GeografiaTabProps) {
 
   return (
     <div className="space-y-4">
-      {/* Honest Stage 1 read-only banner + Stage 2 disabled CTA */}
-      <div className="flex flex-col gap-3 rounded-lg border border-indigo-500/25 bg-indigo-500/6 px-3.5 py-2.5 text-xs sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-start gap-2 text-muted-foreground">
-          <Info className="mt-0.5 size-3.5 shrink-0 text-indigo-600 dark:text-indigo-400" />
-          <p>
-            <span className="font-medium text-foreground">
-              Silver.Dim_Geografia
-            </span>{' '}
-            opera en modo solo lectura con filtros server-side en Etapa 1 (tope de 200 registros por página). La edición de fundos, camas y campañas estará disponible en Etapa 2.
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-2 self-start sm:self-center">
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <span className="inline-flex cursor-not-allowed" tabIndex={0} />
-              }
-            >
-              <Button variant="outline" size="xs" disabled>
-                <Lock className="size-3" />
-                Editar geografía / Camas / Campañas (Etapa 2)
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent className="max-w-xs">
-              En Etapa 1 el endpoint /api/v1/catalogos/geografia es de solo lectura. El mantenimiento de geografía, camas y campañas se habilitará en Etapa 2.
-            </TooltipContent>
-          </Tooltip>
-        </div>
-      </div>
-
       <Card>
         <CardHeader className="space-y-3 border-b pb-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -373,10 +394,22 @@ export function GeografiaTab({ active }: GeografiaTabProps) {
               >
                 {formatNumber(total)} coincidencias
               </Badge>
-              <StatusBadge label="Solo lectura · Etapa 2" tone="readonly" />
+              {!canAdmin && <StatusBadge label="Solo lectura" tone="readonly" />}
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {canAdmin && (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setEditingItem(null)
+                    setDialogOpen(true)
+                  }}
+                >
+                  <Plus className="size-3.5" />
+                  Nueva unidad
+                </Button>
+              )}
               <Select
                 value={String(tamano)}
                 onValueChange={(val) => {
@@ -620,6 +653,12 @@ export function GeografiaTab({ active }: GeografiaTabProps) {
           )}
         </CardContent>
       </Card>
+
+      <GeografiaFormDialog
+        open={dialogOpen}
+        item={editingItem}
+        onOpenChange={setDialogOpen}
+      />
     </div>
   )
 }

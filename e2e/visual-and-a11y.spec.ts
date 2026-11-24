@@ -54,6 +54,32 @@ async function mockBackendApi(page: Page) {
       return
     }
 
+    if (pathname === '/health/calidad/stream') {
+      await route.fulfill({
+        status: 200,
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Access-Control-Allow-Origin': 'http://localhost:4173',
+        },
+        body: `event: calidad\ndata: ${JSON.stringify({
+          total_hoy: 14,
+          top_tipos: [
+            { Tipo_Error_Raw: 'VARIEDAD_NO_HOMOLOGADA', Cuenta: 8 },
+            { Tipo_Error_Raw: 'DNI_INCOMPLETO', Cuenta: 4 },
+            { Tipo_Error_Raw: 'CAMA_NO_EXISTE', Cuenta: 2 },
+          ],
+          top_fundos: [
+            { Fundo_Raw: 'ACP NORTE', Cuenta: 9 },
+            { Fundo_Raw: 'SAN CARLOS', Cuenta: 3 },
+            { Fundo_Raw: 'LA JOYA', Cuenta: 2 },
+          ],
+          timestamp_servidor: '2026-11-23T10:00:00Z',
+        })}\n\n`,
+      })
+      return
+    }
+
     if (pathname.endsWith('/eventos')) {
       await route.fulfill({
         status: 200,
@@ -361,6 +387,7 @@ async function mockBackendApi(page: Page) {
         tamano: 50,
         datos: [
           {
+            id_geografia: 1,
             fundo: 'ACP Norte',
             sector: 'Sector 01',
             modulo: 4,
@@ -370,6 +397,26 @@ async function mockBackendApi(page: Page) {
             es_test_block: false,
             codigo_sap_campo: 'SAP-040212',
             es_vigente: true,
+          },
+        ],
+      })
+    }
+
+    if (pathname === '/api/v1/catalogos/campanas') {
+      return json({
+        total: 1,
+        pagina: 1,
+        tamano: 50,
+        datos: [
+          {
+            id_campana: 2026,
+            codigo: 'CAMP-2026',
+            nombre_campana: 'Campaña Arándano 2026–2027',
+            fecha_inicio: '2026-08-01',
+            fecha_fin: '2027-02-28',
+            es_activa: true,
+            estado: 'ACTIVA',
+            descripcion: 'Campaña comercial principal',
           },
         ],
       })
@@ -481,6 +528,54 @@ async function mockBackendApi(page: Page) {
       })
     }
 
+    if (pathname === '/api/v1/proyecciones/constantes') {
+      return json({
+        plantas_por_punto: 10,
+        decay_factor: { '1': 1, '2': 1, '3': 0.8, '4': 0.8, '5': 0.8, '6': 0.8 },
+        delta_productivas: { '1': 0, '2': 0.02, '3': 0, '4': -0.03, '5': 0.01, '6': 0.01 },
+      })
+    }
+
+    if (pathname === '/api/v1/ingesta/excel/archivos') {
+      return json({
+        carpetas: ['cosecha', 'tareo', 'conteo_fenologico'],
+        archivos: [
+          {
+            carpeta: 'cosecha',
+            nombre: 'cosecha_sem47.xlsx',
+            tamano_bytes: 245760,
+            fecha_modificacion: '2026-11-23T09:15:00Z',
+            estado: 'entrada',
+            tiene_marca_procesado: false,
+          },
+        ],
+      })
+    }
+
+    if (pathname === '/api/v1/auditoria/accesos') {
+      return json({
+        total: 1,
+        pagina: 1,
+        tamano: 50,
+        items: [
+          {
+            id_acceso: 901,
+            fecha: '2026-11-23T09:50:00Z',
+            nombre_usuario: 'admin.acp',
+            rol: 'admin',
+            accion: 'LOGIN_OK',
+            modulo: 'Auth',
+            metodo: 'POST',
+            ruta: '/auth/login',
+            estado_http: 200,
+            ip: '10.20.1.14',
+            request_id: 'req-login-20261123-01',
+            detalle: 'Inicio de sesión exitoso',
+          },
+        ],
+      })
+    }
+
     if (pathname === '/api/v1/auditoria/bitacora/resumen') {
       return json({
         ventana_dias: 7,
@@ -581,12 +676,15 @@ test.describe('ACP Control Web — Visual, Layout & A11y Audit', () => {
     { name: 'cuarentena', path: '/cuarentena' },
     { name: 'maestros-variedades', path: '/maestros?tab=variedades' },
     { name: 'maestros-geografia', path: '/maestros?tab=geografia' },
+    { name: 'maestros-campanas', path: '/maestros?tab=campanas' },
     { name: 'operarios', path: '/operarios' },
     { name: 'config-parametros', path: '/configuracion?tab=parametros' },
     { name: 'config-biologia', path: '/configuracion?tab=biologia' },
+    { name: 'config-reglas', path: '/configuracion?tab=reglas' },
     { name: 'config-usuarios', path: '/configuracion?tab=usuarios' },
     { name: 'auditoria', path: '/auditoria?tab=bitacora' },
     { name: 'auditoria-ingesta', path: '/auditoria?tab=ingesta' },
+    { name: 'auditoria-accesos', path: '/auditoria?tab=accesos' },
   ]
 
   for (const r of routes) {

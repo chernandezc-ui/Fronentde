@@ -1,13 +1,14 @@
 import { useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { BookOpenCheck, MapPin, RefreshCw, Sprout } from 'lucide-react'
+import { BookOpenCheck, CalendarRange, MapPin, RefreshCw, Sprout } from 'lucide-react'
 import { motion, useReducedMotion } from 'motion/react'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { rolCumpleNivel, useAuthStore } from '@/shared/auth/authStore'
 import { StatusBadge } from '@/shared/components/StatusBadge'
+import { CampanasTab } from './components/CampanasTab'
 import { DimVariedadesTab } from './components/DimVariedadesTab'
 import { GeografiaTab } from './components/GeografiaTab'
 import { MdmVariedadesTab } from './components/MdmVariedadesTab'
@@ -63,14 +64,16 @@ export function MaestrosPage() {
                 Datos Maestros
               </h1>
               {canAdmin ? (
-                <StatusBadge label="Admin · CRUD Variedades DWH" tone="ok" />
+                <StatusBadge label="Admin · CRUD Maestros" tone="ok" />
               ) : (
                 <StatusBadge label="Solo lectura" tone="readonly" />
               )}
             </div>
             <p className="text-xs text-muted-foreground">
               Gobierno de dimensiones homologadas del DWH (
-              <span className="font-mono">Silver.Dim_Variedad</span>), catálogo canónico MDM y geografía vigente con búsqueda server-side.
+              <span className="font-mono">Silver.Dim_Variedad</span>,{' '}
+              <span className="font-mono">Silver.Dim_Geografia</span>,{' '}
+              <span className="font-mono">Silver.Dim_Campana</span>) y catálogo canónico MDM.
             </p>
           </div>
 
@@ -82,7 +85,7 @@ export function MaestrosPage() {
           </div>
         </div>
 
-        {/* Tabs synced with URL ?tab=variedades|mdm|geografia */}
+        {/* Tabs synced with URL ?tab=variedades|mdm|geografia|campanas */}
         <Tabs
           value={activeTab}
           onValueChange={handleTabChange}
@@ -101,6 +104,10 @@ export function MaestrosPage() {
               <MapPin className="size-3.5" />
               Geografía
             </TabsTrigger>
+            <TabsTrigger value="campanas" className="gap-1.5 px-3">
+              <CalendarRange className="size-3.5" />
+              Campañas
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="variedades">
@@ -108,11 +115,15 @@ export function MaestrosPage() {
           </TabsContent>
 
           <TabsContent value="mdm">
-            <MdmVariedadesTab active={activeTab === 'mdm'} />
+            <MdmVariedadesTab active={activeTab === 'mdm'} canAdmin={canAdmin} />
           </TabsContent>
 
           <TabsContent value="geografia">
-            <GeografiaTab active={activeTab === 'geografia'} />
+            <GeografiaTab active={activeTab === 'geografia'} canAdmin={canAdmin} />
+          </TabsContent>
+
+          <TabsContent value="campanas">
+            <CampanasTab active={activeTab === 'campanas'} canAdmin={canAdmin} />
           </TabsContent>
         </Tabs>
       </motion.div>

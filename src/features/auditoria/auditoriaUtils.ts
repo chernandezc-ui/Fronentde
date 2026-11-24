@@ -1,4 +1,6 @@
+import { API_ENDPOINTS } from '@/shared/api/endpoints'
 import type {
+  AccesosQueryParams,
   AuditoriaTabId,
   BitacoraFiltrosUrl,
   BitacoraQueryParams,
@@ -62,6 +64,36 @@ export const TABLA_NOMBRE_REGEX = /^[a-zA-Z0-9_.]+$/
 
 /** Límite razonable en frontend para el pre-validador CSV en memoria (25 MB) */
 export const MAX_CSV_FILE_BYTES = 25 * 1024 * 1024
+
+/** Límite para archivos Excel .xlsx hacia cargador Bronce (50 MB) */
+export const MAX_EXCEL_FILE_BYTES = 50 * 1024 * 1024
+
+/** 23 carpetas canónicas reales de `ETL/bronce/rutas.py` */
+export const EXCEL_UPLOAD_FOLDERS: readonly { carpeta: string; tabla: string }[] = [
+  { carpeta: 'conteo_fruta', tabla: 'Bronce.Conteo_Fruta' },
+  { carpeta: 'peladas', tabla: 'Bronce.Peladas' },
+  { carpeta: 'ciclos_fenologicos', tabla: 'Bronce.Ciclos_Fenologicos' },
+  { carpeta: 'evaluacion_pesos', tabla: 'Bronce.Evaluacion_Pesos' },
+  { carpeta: 'induccion_floral', tabla: 'Bronce.Induccion_Floral' },
+  { carpeta: 'floracion', tabla: 'Bronce.Floracion' },
+  { carpeta: 'evaluacion_vegetativa', tabla: 'Bronce.Evaluacion_Vegetativa' },
+  { carpeta: 'tasa_crecimiento_brotes', tabla: 'Bronce.Tasa_Crecimiento_Brotes' },
+  { carpeta: 'evaluacion_calidad_poda', tabla: 'Bronce.Evaluacion_Calidad_Poda' },
+  { carpeta: 'fisiologia', tabla: 'Bronce.Fisiologia' },
+  { carpeta: 'calibres', tabla: 'Bronce.Calibres' },
+  { carpeta: 'tareos', tabla: 'Bronce.Consolidado_Tareos' },
+  { carpeta: 'fiscalizacion', tabla: 'Bronce.Fiscalizacion' },
+  { carpeta: 'seguimiento_errores', tabla: 'Bronce.Seguimiento_Errores' },
+  { carpeta: 'pintado_flores', tabla: 'Bronce.Pintado_Flores' },
+  { carpeta: 'reporte_cosecha', tabla: 'Bronce.Reporte_Cosecha' },
+  { carpeta: 'cierre_mapas_cosecha', tabla: 'Bronce.Cierre_Mapas_Cosecha' },
+  { carpeta: 'reporte_clima', tabla: 'Bronce.Reporte_Clima' },
+  { carpeta: 'data_sap', tabla: 'Bronce.Data_SAP' },
+  { carpeta: 'proyeccion_pesos', tabla: 'Bronce.Proyeccion_Pesos' },
+  { carpeta: 'telemetria_clima', tabla: 'Bronce.Telemetria_Clima' },
+  { carpeta: 'base_plantas_area', tabla: 'Bronce.Base_Plantas_Area' },
+  { carpeta: 'censo_plantas', tabla: 'Bronce.Censo_Plantas' },
+] as const
 
 const ESTADOS_SET = new Set<string>(ESTADOS_BITACORA)
 const VENTANAS_SET = new Set<number>([1, 7, 30, 90])
@@ -200,7 +232,10 @@ export function buildBitacoraPath(params: BitacoraQueryParams): string {
 }
 
 export function parseAuditoriaTab(searchParams: URLSearchParams): AuditoriaTabId {
-  return searchParams.get('tab') === 'ingesta' ? 'ingesta' : 'bitacora'
+  const raw = searchParams.get('tab')
+  if (raw === 'ingesta') return 'ingesta'
+  if (raw === 'accesos') return 'accesos'
+  return 'bitacora'
 }
 
 export function parseBitacoraSearchParams(searchParams: URLSearchParams): BitacoraFiltrosUrl {
@@ -431,4 +466,98 @@ export function extractCatalogTables(facts: readonly EtlFactCatalogItem[]): Tabl
 
 export function buildExportCsvPath(tabla: string): string {
   return `/api/v1/ingesta/descargar/${encodeURIComponent(tabla.trim())}`
+}
+
+/**
+ * Valida archivos `.xlsx` antes de enviarlos a `ETL/data/entrada/{carpeta}`.
+ * Bloquea archivos temporales `~$*`, extensiones distintas de `.xlsx` y archivos > 50 MB.
+ */
+export function validateExcelFile(
+  file: Pick<File, 'name' | 'size'> | null | undefined,
+  maxBytes: number = MAX_EXCEL_FILE_BYTES,
+): CsvFileValidationResult {
+  if (!file) {
+    return { valid: false, error: 'Selecciona un archivo .xlsx para subir.' }
+  }
+  const name = file.name.trim()
+  const lower = name.toLowerCase()
+  if (!name) {
+    return { valid: false, error: 'El archivo no tiene un nombre válido.' }
+  }
+  if (name.startsWith('~$')) {
+    return {
+      valid: false,
+      error: 'No se permiten archivos temporales de Excel (~$*). Cierra el libro en Excel y vuelve a intentar.',
+    }
+  }
+  if (!lower.endsWith('.xlsx')) {
+    return {
+      valid: false,
+      error: 'Solo se permiten libros Excel con extensión .xlsx (ej. cosecha_sap.xlsx).',
+    }
+  }
+  const baseName = lower.slice(0, -5)
+  if (baseName.endsWith('.exe') || baseName.endsWith('.bat') || baseName.endsWith('.cmd')) {
+    return {
+      valid: false,
+      error: 'Nombre de archivo no permitido por seguridad.',
+    }
+  }
+  if (file.size <= 0) {
+    return { valid: false, error: 'El archivo Excel está vacío (0 bytes).' }
+  }
+  if (file.size > maxBytes) {
+    const maxMb = Math.round((maxBytes / (1024 * 1024)) * 10) / 10
+    return {
+      valid: false,
+      error: `El archivo excede el límite máximo de ${maxMb} MB.`,
+    }
+  }
+  return { valid: true, error: null }
+}
+
+export const ACCESOS_PAGE_SIZE_OPTIONS = [20, 50, 100] as const
+
+export const ACCESOS_ACCIONES_PRESETS = [
+  'LOGIN_OK',
+  'LOGIN_FALLIDO',
+  'LOGOUT',
+  'CAMBIO_CONFIG',
+  'CORRIDA_ETL',
+  'CUARENTENA',
+] as const
+
+export function buildAccesosQueryString(params: AccesosQueryParams): string {
+  const qs = new URLSearchParams()
+  const pagina = clampBitacoraPagina(params.pagina)
+  const tamano = clampBitacoraTamano(params.tamano)
+  qs.set('pagina', String(pagina))
+  qs.set('tamano', String(tamano))
+
+  const usuario = params.usuario?.trim().slice(0, 100)
+  if (usuario) {
+    qs.set('usuario', usuario)
+  }
+
+  const accion = params.accion?.trim().slice(0, 80)
+  if (accion) {
+    qs.set('accion', accion)
+  }
+
+  const desdeIso = toIsoDateTimeParam(params.desde)
+  if (desdeIso) {
+    qs.set('desde', desdeIso)
+  }
+
+  const hastaIso = toIsoDateTimeParam(params.hasta)
+  if (hastaIso) {
+    qs.set('hasta', hastaIso)
+  }
+
+  return qs.toString()
+}
+
+export function buildAccesosPath(params: AccesosQueryParams): string {
+  const qs = buildAccesosQueryString(params)
+  return `${API_ENDPOINTS.auditoria.accesos}?${qs}`
 }

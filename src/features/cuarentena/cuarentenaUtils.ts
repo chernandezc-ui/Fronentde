@@ -5,6 +5,7 @@ import type {
   EstadoCuarentenaFiltro,
   PeticionRechazarCuarentena,
   PeticionResolverCuarentena,
+  RegistroCuarentena,
 } from './types'
 
 export const PAGE_SIZE_OPTIONS = [20, 50, 100] as const
@@ -143,8 +144,13 @@ export function parseCuarentenaSearchParams(searchParams: URLSearchParams): Cuar
 
   const estado = normalizeEstadoFiltro(searchParams.get('estado'))
   const tabla = (searchParams.get('tabla') ?? '').trim()
+  const q = (searchParams.get('q') ?? '').trim().slice(0, 80)
+  const columna = (searchParams.get('columna') ?? '').trim().slice(0, 80)
 
-  return { pagina, tamano, estado, tabla }
+  const parsed: CuarentenaFiltrosUrl = { pagina, tamano, estado, tabla }
+  if (q) parsed.q = q
+  if (columna) parsed.columna = columna
+  return parsed
 }
 
 export function serializeCuarentenaSearchParams(filters: CuarentenaFiltrosUrl): URLSearchParams {
@@ -155,6 +161,8 @@ export function serializeCuarentenaSearchParams(filters: CuarentenaFiltrosUrl): 
     : DEFAULT_CUARENTENA_FILTERS.tamano
   const safeEstado = normalizeEstadoFiltro(filters.estado)
   const safeTabla = filters.tabla.trim()
+  const safeQ = (filters.q ?? '').trim().slice(0, 80)
+  const safeColumna = (filters.columna ?? '').trim().slice(0, 80)
 
   params.set('estado', safeEstado)
   if (safePagina > 1) {
@@ -166,8 +174,20 @@ export function serializeCuarentenaSearchParams(filters: CuarentenaFiltrosUrl): 
   if (safeTabla.length > 0) {
     params.set('tabla', safeTabla)
   }
+  if (safeQ.length > 0) {
+    params.set('q', safeQ)
+  }
+  if (safeColumna.length > 0) {
+    params.set('columna', safeColumna)
+  }
 
   return params
+}
+
+export function getCuarentenaRecordKey(
+  record: Pick<RegistroCuarentena, 'tabla_origen' | 'id_registro'>,
+): string {
+  return `${record.tabla_origen}::${record.id_registro}`
 }
 
 export function mapCuarentenaEstadoTone(estado: string | null | undefined): OperationalTone {

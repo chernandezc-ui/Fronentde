@@ -9,9 +9,10 @@ import {
   validateCsvFileApi,
 } from './auditoriaApi'
 import {
+  buildAccesosPath,
   buildBitacoraPath,
-  buildBitacoraQueryString,
   buildExportCsvPath,
+  buildBitacoraQueryString,
   clampBitacoraPagina,
   clampBitacoraTamano,
   DEFAULT_BITACORA_FILTERS,
@@ -19,6 +20,7 @@ import {
   isDateRangeInverted,
   isValidTableName,
   MAX_CSV_FILE_BYTES,
+  MAX_EXCEL_FILE_BYTES,
   parseAuditoriaTab,
   parseBitacoraSearchParams,
   parseContentDispositionFilename,
@@ -26,6 +28,7 @@ import {
   toDateTimeLocalInputValue,
   toIsoDateTimeParam,
   validateCsvFile,
+  validateExcelFile,
 } from './auditoriaUtils'
 
 describe('auditoriaUtils — querystring multi-estado, clamping y fechas', () => {
@@ -380,5 +383,20 @@ describe('auditoriaApi — contratos HTTP en runtime', () => {
       status: 401,
     })
     expect(useAuthStore.getState().token).toBeNull()
+  })
+
+  it('valida libros .xlsx de ingesta Excel y parsea tab accesos en URL', () => {
+    expect(validateExcelFile({ name: 'cosecha_sem47.xlsx', size: 10240 }).valid).toBe(true)
+    expect(validateExcelFile({ name: '~$cosecha_sem47.xlsx', size: 1024 }).valid).toBe(false)
+    expect(validateExcelFile({ name: 'payload.exe', size: 1024 }).valid).toBe(false)
+    expect(validateExcelFile({ name: 'macro.exe.xlsx', size: 1024 }).valid).toBe(false)
+    expect(
+      validateExcelFile({ name: 'gigante.xlsx', size: MAX_EXCEL_FILE_BYTES + 1 }).valid,
+    ).toBe(false)
+
+    expect(parseAuditoriaTab(new URLSearchParams('tab=accesos'))).toBe('accesos')
+    expect(buildAccesosPath({ pagina: 2, tamano: 20, usuario: 'admin.acp', accion: 'LOGIN_OK' })).toBe(
+      '/api/v1/auditoria/accesos?pagina=2&tamano=20&usuario=admin.acp&accion=LOGIN_OK',
+    )
   })
 })

@@ -8,6 +8,8 @@ import {
   isAlertAsertividad,
   matchOperarioIncidencias,
   normalizeDni,
+  operarioFormSchema,
+  toUpsertOperarioPayload,
 } from './operariosUtils'
 
 describe('operariosUtils', () => {
@@ -124,6 +126,40 @@ describe('operariosUtils', () => {
       expect(matches[0].isPersonalColumn).toBe(true)
       expect(matches[1].matchReason).toBe('nombre')
       expect(countPersonalColumnIncidencias(incidencias)).toBe(2)
+    })
+  })
+
+  describe('operarioFormSchema', () => {
+    it('accepts valid 8-digit DNI and normalizes payload', () => {
+      const parsed = operarioFormSchema.parse({
+        dni: ' 07451234 ',
+        nombre_completo: '  María José Pérez  ',
+        rol: 'Evaluador',
+        sexo: 'F',
+        id_planilla: ' PL-9081 ',
+        es_activo: true,
+      })
+      expect(toUpsertOperarioPayload(parsed)).toEqual({
+        dni: '07451234',
+        nombre_completo: 'María José Pérez',
+        rol: 'Evaluador',
+        sexo: 'F',
+        id_planilla: 'PL-9081',
+        es_activo: true,
+      })
+    })
+
+    it('rejects short DNI or name under 3 chars', () => {
+      expect(
+        operarioFormSchema.safeParse({
+          dni: '123',
+          nombre_completo: 'Ana',
+          rol: '',
+          sexo: '',
+          id_planilla: '',
+          es_activo: true,
+        }).success,
+      ).toBe(false)
     })
   })
 })

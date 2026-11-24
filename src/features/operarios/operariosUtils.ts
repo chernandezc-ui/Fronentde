@@ -1,9 +1,11 @@
+import { z } from 'zod'
 import type {
   AsertividadClasificacion,
   CuarentenaIncidencia,
   OperarioIncidenciaMatch,
   OperarioPersonal,
   OperariosKpiSummary,
+  UpsertOperarioPayload,
 } from './types'
 
 export const ASERTIVIDAD_OK_MIN = 90
@@ -307,4 +309,36 @@ export function formatSexoLabel(sexo: string | null | undefined): string {
   if (norm === 'M' || norm === 'MASCULINO') return 'Masculino (M)'
   if (norm === 'F' || norm === 'FEMENINO') return 'Femenino (F)'
   return sexo.trim()
+}
+
+export const operarioFormSchema = z.object({
+  dni: z
+    .string()
+    .trim()
+    .regex(
+      /^[A-Za-z0-9]{6,15}$/,
+      'El DNI/documento debe tener entre 6 y 15 caracteres alfanuméricos.',
+    ),
+  nombre_completo: z
+    .string()
+    .trim()
+    .min(3, 'El nombre completo es obligatorio (mínimo 3 caracteres).')
+    .max(150, 'Máximo 150 caracteres.'),
+  rol: z.string().trim().max(80, 'Máximo 80 caracteres.'),
+  sexo: z.enum(['', 'M', 'F']),
+  id_planilla: z.string().trim().max(40, 'Máximo 40 caracteres.'),
+  es_activo: z.boolean(),
+})
+
+export type OperarioFormValues = z.infer<typeof operarioFormSchema>
+
+export function toUpsertOperarioPayload(values: OperarioFormValues): UpsertOperarioPayload {
+  return {
+    dni: values.dni.trim().toUpperCase(),
+    nombre_completo: values.nombre_completo.trim(),
+    rol: values.rol.trim() || null,
+    sexo: values.sexo || null,
+    id_planilla: values.id_planilla.trim() || null,
+    es_activo: values.es_activo,
+  }
 }

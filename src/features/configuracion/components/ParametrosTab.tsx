@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   AlertCircle,
   ArrowUpRight,
@@ -599,27 +600,31 @@ export function ParametrosTab({
         </CardContent>
       </Card>
 
-      {/* Honest Etapa 2 notice for Dim_Campana */}
+      {/* Direct access to Campañas CRUD in Datos Maestros */}
       <Alert className="border-indigo-500/25 bg-indigo-500/[0.06]">
         <Info className="size-4 text-indigo-600 dark:text-indigo-400" />
         <AlertTitle className="flex flex-wrap items-center gap-2 text-xs font-semibold">
           <span>Gestión de campañas (Silver.Dim_Campana)</span>
-          <StatusBadge
-            label="Etapa 2"
-            tone="readonly"
-            showDot={false}
-            className="text-[10px]"
-          />
         </AlertTitle>
-        <AlertDescription className="text-xs text-muted-foreground">
-          Los parámetros operativos de campaña aquí listados ajustan el
-          comportamiento del pipeline en{' '}
-          <span className="font-mono text-foreground">
-            Config.Parametros_Pipeline
+        <AlertDescription className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
+          <span>
+            Los parámetros aquí listados ajustan{' '}
+            <span className="font-mono text-foreground">
+              Config.Parametros_Pipeline
+            </span>
+            . El mantenimiento de vigencias y cierres de{' '}
+            <span className="font-mono text-foreground">Silver.Dim_Campana</span>{' '}
+            se administra directamente en Datos Maestros.
           </span>
-          . El mantenimiento CRUD de vigencias y cierres de{' '}
-          <span className="font-mono text-foreground">Silver.Dim_Campana</span>{' '}
-          se habilitará en la <strong>Etapa 2</strong> del backend.
+          <Button
+            variant="outline"
+            size="xs"
+            nativeButton={false}
+            render={<Link to="/maestros?tab=campanas" />}
+          >
+            Administrar campañas
+            <ArrowUpRight className="size-3.5" />
+          </Button>
         </AlertDescription>
       </Alert>
     </div>
