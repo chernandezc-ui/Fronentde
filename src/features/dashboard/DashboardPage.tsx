@@ -46,7 +46,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
 import { useAuthStore, rolCumpleNivel } from '@/shared/auth/authStore'
 import { ApiErrorBanner } from '@/shared/components/ApiErrorBanner'
-import { StatusBadge, mapEstadoToTone, type OperationalTone } from '@/shared/components/StatusBadge'
+import { StatusBadge, type OperationalTone } from '@/shared/components/StatusBadge'
+import { mapEstadoToTone } from '@/shared/components/statusTone'
 import { formatDateTime, formatDuration, formatNumber, notifyApiError } from '@/shared/lib/format'
 import {
   ackAlerta,

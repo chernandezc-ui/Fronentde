@@ -19,6 +19,15 @@ describe('endpoints & stage 2 error detection', () => {
     )
     expect(API_ENDPOINTS.ingesta.excelSubir).toBe('/api/v1/ingesta/excel/subir')
     expect(API_ENDPOINTS.auditoria.accesos).toBe('/api/v1/auditoria/accesos')
+    expect(API_ENDPOINTS.proyecciones.fechas).toBe('/api/v1/proyecciones/fechas')
+    expect(API_ENDPOINTS.proyecciones.combinaciones(20261123)).toBe(
+      '/api/v1/proyecciones/combinaciones/20261123',
+    )
+    expect(API_ENDPOINTS.proyecciones.integridad(20261123)).toBe(
+      '/api/v1/proyecciones/integridad/20261123',
+    )
+    expect(API_ENDPOINTS.proyecciones.ejecutar).toBe('/api/v1/proyecciones/ejecutar')
+    expect(API_ENDPOINTS.proyecciones.simular).toBe('/api/v1/proyecciones/simular')
   })
 
   it('detects 404, 405 and 501 ApiError instances as not implemented', () => {

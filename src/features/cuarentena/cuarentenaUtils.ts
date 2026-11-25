@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { mapEstadoToTone, type OperationalTone } from '@/shared/components/StatusBadge'
+import { mapEstadoToTone, type OperationalTone } from '@/shared/components/statusTone'
 import type {
   CuarentenaFiltrosUrl,
   EstadoCuarentenaFiltro,

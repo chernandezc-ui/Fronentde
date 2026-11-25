@@ -5,7 +5,6 @@ import { BookOpenCheck, CalendarRange, MapPin, RefreshCw, Sprout } from 'lucide-
 import { motion, useReducedMotion } from 'motion/react'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { TooltipProvider } from '@/components/ui/tooltip'
 import { rolCumpleNivel, useAuthStore } from '@/shared/auth/authStore'
 import { StatusBadge } from '@/shared/components/StatusBadge'
 import { CampanasTab } from './components/CampanasTab'
@@ -49,13 +48,12 @@ export function MaestrosPage() {
   }, [queryClient])
 
   return (
-    <TooltipProvider>
-      <motion.div
-        initial={reduceMotion ? false : { opacity: 0, y: 6 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.18, ease: 'easeOut' }}
-        className="space-y-5"
-      >
+    <motion.div
+      initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.18, ease: 'easeOut' }}
+      className="space-y-5"
+    >
         {/* Page Header */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
@@ -127,6 +125,5 @@ export function MaestrosPage() {
           </TabsContent>
         </Tabs>
       </motion.div>
-    </TooltipProvider>
   )
 }

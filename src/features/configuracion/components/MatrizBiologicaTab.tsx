@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   AlertTriangle,
+  ArrowUpRight,
   CheckCircle2,
   FlaskConical,
   Info,
@@ -401,6 +403,16 @@ export function MatrizBiologicaTab({
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                nativeButton={false}
+                render={<Link to="/proyecciones" />}
+              >
+                Simulador Six-Week
+                <ArrowUpRight className="size-3.5" />
+              </Button>
+
               <Button
                 type="button"
                 variant="outline"

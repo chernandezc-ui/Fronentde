@@ -11,9 +11,6 @@ import { motion, useReducedMotion } from 'motion/react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import {
-  TooltipProvider,
-} from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { rolCumpleNivel, useAuthStore } from '@/shared/auth/authStore'
 import { StatusBadge } from '@/shared/components/StatusBadge'
@@ -53,13 +50,12 @@ export function OperariosPage() {
   )
 
   return (
-    <TooltipProvider>
-      <motion.div
-        initial={reduceMotion ? false : { opacity: 0, y: 6 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.18, ease: 'easeOut' }}
-        className="space-y-5"
-      >
+    <motion.div
+      initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.18, ease: 'easeOut' }}
+      className="space-y-5"
+    >
         {/* Cabecera operativa */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
@@ -272,6 +268,5 @@ export function OperariosPage() {
           />
         )}
       </motion.div>
-    </TooltipProvider>
   )
 }

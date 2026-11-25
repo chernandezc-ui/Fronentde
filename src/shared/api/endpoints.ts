@@ -108,6 +108,24 @@ export const API_ENDPOINTS = {
     /** GET ?pagina&tamano&usuario&accion&desde&hasta -> { items, total, pagina, tamano } */
     accesos: '/api/v1/auditoria/accesos',
   },
+
+  // ── 08. Proyecciones Six-Week (Etapa 1 activas + Etapa 2 simulación) ────────
+  proyecciones: {
+    /** GET -> { fechas: number[] } (ID_Tiempo YYYYMMDD disponibles) */
+    fechas: '/api/v1/proyecciones/fechas',
+    /** GET -> Array<{ Fundo, Modulo, Variedad, Condicion }> */
+    combinaciones: (idTiempo: number | string) =>
+      `/api/v1/proyecciones/combinaciones/${encodeURIComponent(String(idTiempo))}`,
+    /** GET ?modulo&variedad&condicion -> { conteo: boolean, peladas: boolean, pesos: boolean } */
+    integridad: (idTiempo: number | string) =>
+      `/api/v1/proyecciones/integridad/${encodeURIComponent(String(idTiempo))}`,
+    /** GET / POST matriz biológica Six-Week (PROY_SIXWEEK_MATRIZ_INPUTS) */
+    matriz: '/api/v1/proyecciones/matriz',
+    /** POST -> calcula y persiste proyección Six-Week en Silver.Fact_Proyecciones */
+    ejecutar: '/api/v1/proyecciones/ejecutar',
+    /** POST (Etapa 2) -> simulación en memoria sin persistencia */
+    simular: '/api/v1/proyecciones/simular',
+  },
 } as const
 
 /**

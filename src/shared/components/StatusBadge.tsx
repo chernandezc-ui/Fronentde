@@ -1,15 +1,8 @@
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import { mapEstadoToTone, type OperationalTone } from '@/shared/components/statusTone'
 
-export type OperationalTone =
-  | 'ok'
-  | 'running'
-  | 'pending'
-  | 'warning'
-  | 'error'
-  | 'cancelled'
-  | 'neutral'
-  | 'readonly'
+export type { OperationalTone }
 
 const TONE_CLASSES: Record<OperationalTone, string> = {
   ok: 'border-emerald-500/30 bg-emerald-500/12 text-emerald-700 dark:text-emerald-300',
@@ -31,17 +24,6 @@ const DOT_CLASSES: Record<OperationalTone, string> = {
   cancelled: 'bg-zinc-400',
   neutral: 'bg-muted-foreground/60',
   readonly: 'bg-indigo-500',
-}
-
-export function mapEstadoToTone(estado: string | null | undefined): OperationalTone {
-  const norm = (estado || '').toUpperCase().trim()
-  if (['OK', 'ACTIVO', 'LIBRE', 'COMPLETADO', 'RESUELTO', 'PUBLICADO', 'EXITOSO'].includes(norm)) return 'ok'
-  if (['EJECUTANDO', 'EN_PROCESO', 'PROCESANDO', 'OCUPADO', 'RUNNING'].includes(norm)) return 'running'
-  if (['PENDIENTE', 'EN_COLA', 'QUEUED', 'DEGRADADO'].includes(norm)) return 'pending'
-  if (['PARCIAL', 'ADVERTENCIA', 'INCOMPLETO', 'ESTIMADO'].includes(norm)) return 'warning'
-  if (['ERROR', 'FALLIDO', 'TIMEOUT', 'LOCK_VENCIDO', 'NO_LISTO', 'CONTROL_PLANE_ERROR', 'RECHAZADO'].includes(norm)) return 'error'
-  if (['CANCELADO', 'DESCARTADO'].includes(norm)) return 'cancelled'
-  return 'neutral'
 }
 
 interface StatusBadgeProps {

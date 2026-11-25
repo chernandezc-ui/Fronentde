@@ -536,6 +536,50 @@ async function mockBackendApi(page: Page) {
       })
     }
 
+    if (pathname === '/api/v1/proyecciones/fechas') {
+      return json({ fechas: [20261123, 20261116] })
+    }
+
+    if (pathname.startsWith('/api/v1/proyecciones/combinaciones/')) {
+      return json([
+        { Fundo: 'ACP NORTE', Modulo: '1', Variedad: 'Biloxi', Condicion: 'Suelo - Convencional' },
+        { Fundo: 'SAN CARLOS', Modulo: '2', Variedad: 'Sekoya', Condicion: 'Maceta - Orgánico' },
+      ])
+    }
+
+    if (pathname.startsWith('/api/v1/proyecciones/integridad/')) {
+      return json({ conteo: true, peladas: true, pesos: true })
+    }
+
+    if (pathname === '/api/v1/proyecciones/ejecutar' || pathname === '/api/v1/proyecciones/simular') {
+      return json({
+        df_semanal: [
+          {
+            semana: 1,
+            semana_label: 'W1 (30/11)',
+            fecha_semana: '2026-11-30',
+            kg_proyectados: 4200,
+            kg_pesimista: 4160.52,
+            kg_optimista: 4244.94,
+            kg_anterior: 0,
+            pct_variacion: 0,
+            tendencia: 'Estable',
+          },
+        ],
+        kpis: {
+          total_base: 4200,
+          total_opt: 4244.94,
+          total_pes: 4160.52,
+          variedad_top: 'Biloxi',
+          total_plantas: 12000,
+          kg_por_planta: 0.35,
+          unidades_cubiertas: 2,
+          unidades_totales: 2,
+        },
+        df_detalle: [],
+      })
+    }
+
     if (pathname === '/api/v1/ingesta/excel/archivos') {
       return json({
         carpetas: ['cosecha', 'tareo', 'conteo_fenologico'],
@@ -674,6 +718,7 @@ test.describe('ACP Control Web — Visual, Layout & A11y Audit', () => {
     { name: 'dashboard', path: '/' },
     { name: 'etl', path: '/etl' },
     { name: 'cuarentena', path: '/cuarentena' },
+    { name: 'proyecciones', path: '/proyecciones' },
     { name: 'maestros-variedades', path: '/maestros?tab=variedades' },
     { name: 'maestros-geografia', path: '/maestros?tab=geografia' },
     { name: 'maestros-campanas', path: '/maestros?tab=campanas' },

@@ -19,6 +19,7 @@ import {
   ShieldAlert,
   SlidersHorizontal,
   Sun,
+  TrendingUp,
   User,
   Users,
   Workflow,
@@ -52,7 +53,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { cn } from '@/lib/utils'
 import { API_BASE_URL } from '@/shared/api/client'
 import { rolCumpleNivel, useAuthStore, type RolUsuario } from '@/shared/auth/authStore'
-import { StatusBadge, mapEstadoToTone } from '@/shared/components/StatusBadge'
+import { StatusBadge } from '@/shared/components/StatusBadge'
+import { mapEstadoToTone } from '@/shared/components/statusTone'
 import { useTheme } from '@/shared/lib/theme'
 import { fetchCurrentUser } from '@/features/auth/authApi'
 import { ChangePasswordDialog } from '@/features/auth/ChangePasswordDialog'
@@ -93,6 +95,14 @@ const NAV_MODULES: NavModuleItem[] = [
     shortLabel: 'Cuarentena',
     description: 'Registros rechazados y resolución MDM',
     icon: ShieldAlert,
+    minRole: 'viewer',
+  },
+  {
+    to: '/proyecciones',
+    label: 'Proyecciones',
+    shortLabel: 'Six-Week',
+    description: 'Proyección fenológica Six-Week y cobertura',
+    icon: TrendingUp,
     minRole: 'viewer',
   },
   {

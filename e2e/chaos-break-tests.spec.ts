@@ -34,6 +34,7 @@ const ALL_APP_ROUTES = [
   '/',
   '/etl',
   '/cuarentena',
+  '/proyecciones',
   '/maestros?tab=variedades',
   '/maestros?tab=geografia',
   '/maestros?tab=campanas',
